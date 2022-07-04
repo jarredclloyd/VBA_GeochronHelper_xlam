@@ -253,9 +253,9 @@ Start:
                     Ratio176Hf177HfCol = HeaderRange.Find(what:="176Hf->258/178Hf->260", MatchCase:=False).Column
                     CheckRatio176Hf177Hf = True
                 Else
-                    Set Ratio176Hf177HfCol = HeaderRange.Find(what:="176Hf->258/178Hf", MatchCase:=False)
+                    Set Ratio176Hf177HfCol = HeaderRange.Find(what:="176Hf/178Hf", MatchCase:=False)
                     If Not Ratio176Hf177HfCol Is Nothing Then
-                        Ratio176Hf177HfCol = HeaderRange.Find(what:="176Hf->258/178Hf", MatchCase:=False).Column
+                        Ratio176Hf177HfCol = HeaderRange.Find(what:="176Hf/178Hf", MatchCase:=False).Column
                         CheckRatio176Hf177Hf = True
                     Else
                         CheckRatio176Hf177Hf = False
