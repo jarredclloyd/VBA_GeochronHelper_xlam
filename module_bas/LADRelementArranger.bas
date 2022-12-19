@@ -1,7 +1,6 @@
 Attribute VB_Name = "LADRelementArranger"
 'Module for handling LADR elemental concentration data outputs
-'Created By Jarred Lloyd on 2020-07-02
-'Last modified on 2022-07-02
+'Last modified on 2022-12-19
 'Feel free to modify but give credit and do not sell any version of this, modified or not. It is to remain free for those who need it
 
 Option Explicit
@@ -36,6 +35,7 @@ Option Compare Text
         Dim AnalysisCol As Long
         Dim ALNumCol As Long
         Dim CommentsCol As Long
+        Dim ElementTotalCol As Long
         Dim EleStartCol As Variant
         Dim EleEndCol As Long
         Dim TraceElementDataPresent As Boolean
@@ -63,6 +63,7 @@ Option Compare Text
         Dim Sample As String
         Dim Analysis As String
         Dim n As Long
+        Dim NumberingFormat As String
     'Variables for splitting standards and unknowns (f=first row, l = last row)
         Dim Standard1f As Long
         Dim Standard1l As Long
@@ -93,7 +94,7 @@ Private Sub LADRprocessorElemental()
 'This procedure transforms CSV output from LADR into a human readable arrangment. This specific procedure handles elemental data.
 
     'Define number and name of standards
-DefineStandards:                NumStandards = Application.InputBox("How many different standards were used?", "LADRElemental_Arranger", 4, Type:=1)
+DefineStandards:                NumStandards = Application.InputBox("How many different standards were used?", "LADRElemental_Arranger", 2, Type:=1)
         Select Case NumStandards
             Case 1
                 Standard1 = Application.InputBox("What is the sample name of the first standard as it is shown in the output CSV?", "LADRWetherill_Arranger", Type:=2)
@@ -207,6 +208,7 @@ Start:
             'Check and define presence of trace element data
                 Set EleStartCol = HeaderRange.Find(what:=FirstMass, MatchCase:=False)
                 If Not EleStartCol Is Nothing Then
+                    ElementTotalCol = HeaderRange.Find(what:="Element Total", MatchCase:=False).Column
                     EleStartCol = HeaderRange.Find(what:=FirstMass, MatchCase:=False).Column
                     EleEndCol = HeaderRange.Find(what:=LastMass, MatchCase:=False).Column
                 Else
@@ -216,16 +218,19 @@ Start:
     'Add new sheets
         Sheets.Add.Name = "Elemental Data"
         Sheets("Original Data").Activate
-    'Copy AL#, sample name and analysis number
+    'Copy AL#, sample name and analysis number, and element total
         Range(Cells(ODStartRowA, ALNumCol), Cells(ODLastRowA, ALNumCol)).Copy Destination:=Sheets("Elemental Data").Range("A1")
+        Sheets("Elemental Data").Range("A1").Value = "ALnum"
         Range(Cells(ODStartRowA, SampleCol), Cells(ODLastRowA, AnalysisCol)).Copy Destination:=Sheets("Elemental Data").Range("B1")
     'Copy elemental data and uncertainties
         EDLastCol = Sheets("Elemental Data").Cells(1, Columns.Count).End(xlToLeft).Column
         EDNextCol = EDLastCol + 1
+        Range(Cells(ODStartRowA, ElementTotalCol), Cells(ODLastRowA, ElementTotalCol)).Copy Destination:=Sheets("Elemental Data").Cells(1, EDNextCol)
+        EDNextCol = EDNextCol + 1
         For n = EleStartCol To EleEndCol
             Range(Cells(ODStartRowA, n), Cells(ODLastRowA, n)).Copy Destination:=Sheets("Elemental Data").Cells(1, EDNextCol)
             EDNextCol = EDNextCol + 1
-            Sheets("Elemental Data").Cells(1, EDNextCol).Value = Sheets("Elemental Data").Cells(1, EDNextCol - 1).Value & " " & StandardErrorLevel & "SE"
+            Sheets("Elemental Data").Cells(1, EDNextCol).Value = Sheets("Elemental Data").Cells(1, EDNextCol - 1).Value & "_" & StandardErrorLevel & "SE"
             Range(Cells(ODStartRowB, n), Cells(ODLastRowB, n)).Copy Destination:=Sheets("Elemental Data").Cells(2, EDNextCol)
             EDNextCol = EDNextCol + 1
         Next n
@@ -241,15 +246,45 @@ Start:
     Sheets("Elemental Data").Activate 'Correct sample label and trailing number for correct sorting in Excel
             EDLastCol = Sheets("Elemental Data").Cells(1, Columns.Count).End(xlToLeft).Column
             EDLastRow = Sheets("Elemental Data").Cells(Rows.Count, 1).End(xlUp).Row
-            For n = 2 To EDLastRow
-                SourceFile = Cells(n, SFColDel).Value
-                SourceFile = Left(SourceFile, InStrRev(SourceFile, ".") - 1)
-                Sample = Left(SourceFile, InStrRev(SourceFile, "-") - 2)
-                Range("B" & n).Value = Sample
-                Analysis = Right(SourceFile, Len(SourceFile) - Len(Sample) - 2)
-                Analysis = Format(Analysis, "000")
-                Range("C" & n).Value = Sample & " - " & Analysis
-            Next n
+            If Left(Cells(2, SFColDel).Value, 2) = "1-" Or Left(Cells(2, SFColDel).Value, 2) = "1 -" Then
+                NumberingFormat = "NewWave"
+                Else
+                NumberingFormat = "GeoStar"
+            End If
+            Select Case NumberingFormat
+                Case "GeoStar"
+                    For n = 2 To EDLastRow
+                        SourceFile = Cells(n, SFColDel).Value
+                        SourceFile = Left(SourceFile, InStrRev(SourceFile, ".") - 1)
+                        If Mid(SourceFile, InStrRev(SourceFile, "-") - 1, 3) = " - " Then
+                            Sample = Left(SourceFile, InStrRev(SourceFile, "-") - 2)
+                        Else
+                            Sample = Left(SourceFile, InStrRev(SourceFile, "-") - 1)
+                        End If
+                        Range("B" & n).Value = Sample
+                        Analysis = Right(SourceFile, Len(SourceFile) - Len(Sample) - 2)
+                        Analysis = Format(Analysis, "000")
+                        Range("C" & n).Value = Sample & "-" & Analysis
+                    Next n
+                Case "NewWave"
+                    For n = 2 To EDLastRow
+                        SourceFile = Cells(n, SFColDel).Value
+                        SourceFile = Left(SourceFile, InStrRev(SourceFile, ".") - 1)
+                        If Mid(SourceFile, InStr(1, SourceFile, "-") - 1, 3) = " - " Then
+                            Sample = Right(SourceFile, Len(SourceFile) - (InStr(1, SourceFile, "-") + 1))
+                        Else
+                            Sample = Right(SourceFile, Len(SourceFile) - InStr(1, SourceFile, "-"))
+                        End If
+                        Range("B" & n).Value = Sample
+                        If Mid(SourceFile, InStr(1, SourceFile, "-") - 1, 3) = " - " Then
+                            Analysis = Left(SourceFile, InStr(1, SourceFile, "-") - 2)
+                        Else
+                            Analysis = Left(SourceFile, InStr(1, SourceFile, "-") - 1)
+                        End If
+                        Analysis = Format(Analysis, "000")
+                        Range("C" & n).Value = Analysis & "-" & Sample
+                    Next n
+            End Select
     'Sort prior to cut - performance optimisation
         'Delete sourcefile column
             Columns(SFColDel).Delete
@@ -258,7 +293,7 @@ Start:
             EDLastRow = Sheets("Elemental Data").Cells(Rows.Count, 1).End(xlUp).Row
             Set EDRange = Sheets("Elemental Data").Range("A1", Cells(EDLastRow, EDLastCol))
             With EDRange
-                .Sort Key1:=Range("C1"), order1:=xlAscending, Header:=xlYes
+                .Sort Key1:=Range("B1"), order1:=xlAscending, Header:=xlYes
             End With
      'Separate Standards and Unknowns
         'Add standards worksheets

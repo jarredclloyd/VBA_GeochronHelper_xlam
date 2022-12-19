@@ -1,7 +1,7 @@
 Attribute VB_Name = "LADRprocessorUPb"
 'Module for handling LADR U-Pb geochronology data outputs
 'Created By Jarred Lloyd on 2020-03-08
-'Last modified on 2022-07-02
+'Last modified on 2022-08-22
 'Feel free to modify but give credit and do not sell any version of this, modified or not. It is to remain free for those who need it
 
 Option Explicit
@@ -44,6 +44,7 @@ Option Compare Text
         Dim AnalysisCol As Long
         Dim ALNumCol As Long
         Dim CommentsCol As Long
+        Dim ElementTotalCol As Long
         Dim EleStartCol As Variant
         Dim EleEndCol As Long
         Dim TraceElementDataPresent As Boolean
@@ -67,6 +68,7 @@ Option Compare Text
         Dim EleUnStartCol As Long
         Dim EleUnEndCol As Long
     'Variables for checking ratio/age presence
+        Dim ElementSymNumOrder As Variant
         Dim Check208206 As Boolean
         Dim Check204206 As Boolean
         Dim Check238206 As Boolean
@@ -109,6 +111,7 @@ Option Compare Text
         Dim Sample As String
         Dim Analysis As String
         Dim n As Long
+        Dim NumberingFormat As String
     'Variables for splitting standards and unknowns (f=first row, l = last row)
         Dim Standard1f As Long
         Dim Standard1l As Long
@@ -207,7 +210,6 @@ Sub LADRUPbWetherillConfirm(control As IRibbonControl)
 End Sub
 Private Sub LADRprocessorUPb()
 'This procedure transforms CSV output from LADR into a human readable, IsoplotR interoperable arrangment. This specific procedure handles U-Pb data, dynamically determining presence of trace element data, ratio and age estimates, error correlations (or estimates if signal precision, and three system calculation is possible)
-
     'Define number and name of standards
 DefineStandards:                NumStandards = Application.InputBox("How many different standards were used?", "LADR_Wetherill_Arranger", 4, Type:=1)
         Select Case NumStandards
@@ -331,122 +333,248 @@ Start:
             'Check and define presence of trace element data
                 Set EleStartCol = HeaderRange.Find(what:=FirstMass, MatchCase:=False)
                 If Not EleStartCol Is Nothing Then
+                    ElementTotalCol = HeaderRange.Find(what:="Element Total", MatchCase:=False).Column
                     EleStartCol = HeaderRange.Find(what:=FirstMass, MatchCase:=False).Column
                     EleEndCol = HeaderRange.Find(what:=LastMass, MatchCase:=False).Column
                     TraceElementDataPresent = True
                 Else
                     TraceElementDataPresent = False
                 End If
-            'Check and define U238/Pb206 ratio
-                Set Ratio238206Col = HeaderRange.Find(what:="238U/206Pb", MatchCase:=False, lookat:=xlWhole)
-                If Not Ratio238206Col Is Nothing Then
-                    Ratio238206Col = HeaderRange.Find(what:="238U/206Pb", MatchCase:=False).Column
-                    Check238206 = True
-                Else
-                    Check238206 = False
+            'Define element symbol and number order
+                If Cells(FirstMassRow, 1).Value Like "#*" Then
+                    ElementSymNumOrder = "NumSym"
+                ElseIf Cells(FirstMassRow, 1).Value Like "[A-Z]*" Then
+                    ElementSymNumOrder = "SymNum"
                 End If
-            'Check and define Pb208/Pb206 ratio
-                Set Ratio208206Col = HeaderRange.Find(what:="208Pb/206Pb", MatchCase:=False, lookat:=xlWhole)
-                If Not Ratio208206Col Is Nothing Then
-                    Ratio208206Col = HeaderRange.Find(what:="208Pb/206Pb", MatchCase:=False).Column
-                    Check208206 = True
-                Else
-                    Check208206 = False
-                End If
-            'Check and define Pb207/U235 (calc) ratio
-                Set Ratio207235calcCol = HeaderRange.Find(what:="207Pb/235U(calc)", MatchCase:=False, lookat:=xlWhole)
-                    If Not Ratio207235calcCol Is Nothing Then
-                        Ratio207235calcCol = HeaderRange.Find(what:="207Pb/235U(calc)", MatchCase:=False, lookat:=xlWhole).Column
-                        Check207235calc = True
+            Select Case ElementSymNumOrder
+                Case "NumSym"
+                    'Check and define U238/Pb206 ratio
+                        Set Ratio238206Col = HeaderRange.Find(what:="238U/206Pb", MatchCase:=False, lookat:=xlWhole)
+                        If Not Ratio238206Col Is Nothing Then
+                            Ratio238206Col = HeaderRange.Find(what:="238U/206Pb", MatchCase:=False).Column
+                            Check238206 = True
+                        Else
+                            Check238206 = False
+                        End If
+                    'Check and define Pb208/Pb206 ratio
+                        Set Ratio208206Col = HeaderRange.Find(what:="208Pb/206Pb", MatchCase:=False, lookat:=xlWhole)
+                        If Not Ratio208206Col Is Nothing Then
+                            Ratio208206Col = HeaderRange.Find(what:="208Pb/206Pb", MatchCase:=False).Column
+                            Check208206 = True
+                        Else
+                            Check208206 = False
+                        End If
+                    'Check and define Pb207/U235 (calc) ratio
+                        Set Ratio207235calcCol = HeaderRange.Find(what:="207Pb/235U(calc)", MatchCase:=False, lookat:=xlWhole)
+                            If Not Ratio207235calcCol Is Nothing Then
+                                Ratio207235calcCol = HeaderRange.Find(what:="207Pb/235U(calc)", MatchCase:=False, lookat:=xlWhole).Column
+                                Check207235calc = True
+                            Else
+                                Check207235calc = False
+                            End If
+                    'Check and define Pb207/U235 ratio
+                        Set Ratio207235Col = HeaderRange.Find(what:="207Pb/235U", MatchCase:=False, lookat:=xlWhole)
+                        If Not Ratio207235Col Is Nothing Then
+                            Ratio207235Col = HeaderRange.Find(what:="207Pb/235U", MatchCase:=False, lookat:=xlWhole).Column
+                            Check207235 = True
+                        Else
+                            Check207235 = False
+                        End If
+                    'Check and define Pb206/U238 ratio
+                        Set Ratio206238Col = HeaderRange.Find(what:="206Pb/238U", MatchCase:=False, lookat:=xlWhole)
+                        If Not Ratio206238Col Is Nothing Then
+                            Ratio206238Col = HeaderRange.Find(what:="206Pb/238U", MatchCase:=False).Column
+                            Check206238 = True
+                        Else
+                            Check206238 = False
+                        End If
+                    'Check and define Pb207/Pb206 ratio
+                        Set Ratio207206Col = HeaderRange.Find(what:="207Pb/206Pb", MatchCase:=False, lookat:=xlWhole)
+                        If Not Ratio207206Col Is Nothing Then
+                            Ratio207206Col = HeaderRange.Find(what:="207Pb/206Pb", MatchCase:=False).Column
+                            Check207206 = True
+                        Else
+                            Check207206 = False
+                        End If
+                    'Check and define Pb207/Pb206 ratio
+                        Set Ratio204206Col = HeaderRange.Find(what:="204Pb/206Pb", MatchCase:=False, lookat:=xlWhole)
+                        If Not Ratio204206Col Is Nothing Then
+                            Ratio204206Col = HeaderRange.Find(what:="204Pb/206Pb", MatchCase:=False).Column
+                            Check204206 = True
+                        Else
+                            Check204206 = False
+                        End If
+                    'Check and define Pb208/Th232 ratio
+                        Set Ratio208232Col = HeaderRange.Find(what:="208Pb/232Th", MatchCase:=False, lookat:=xlWhole)
+                        If Not Ratio208232Col Is Nothing Then
+                            Ratio208232Col = HeaderRange.Find(what:="208Pb/232Th", MatchCase:=False, lookat:=xlWhole).Column
+                            Check208232 = True
+                        Else
+                            Check208232 = False
+                        End If
+                    'Check and define 238/206 AgeEstimate
+                        Select Case Check238206
+                            Case True
+                                AgeEstimate238206Col = HeaderRange.Find(what:="238U/206Pb Age (Ma)", MatchCase:=False, lookat:=xlWhole).Column
+                            Case False
+                        End Select
+                    'Check and define 207/235 (calc) AgeEstimate
+                        Select Case Check207235calc
+                            Case True
+                                AgeEstimate207235calcCol = HeaderRange.Find(what:="207Pb/235U(calc) Age (Ma)", MatchCase:=False).Column
+                            Case False
+                        End Select
+                    'Check and define 207/235 AgeEstimate
+                        Select Case Check207235
+                            Case True
+                                AgeEstimate207235Col = HeaderRange.Find(what:="207Pb/235U Age (Ma)", MatchCase:=False).Column
+                            Case False
+                        End Select
+                    'Check and define 206/238 AgeEstimate
+                        Select Case Check206238
+                            Case True
+                                AgeEstimate206238Col = HeaderRange.Find(what:="206Pb/238U Age (Ma)", MatchCase:=False, lookat:=xlWhole).Column
+                            Case False
+                        End Select
+                    'Check and define 208/232 AgeEstimate
+                        Select Case Check208232
+                            Case True
+                                AgeEstimate208232Col = HeaderRange.Find(what:="208Pb/232Th Age (Ma)", MatchCase:=False, lookat:=xlWhole).Column
+                            Case False
+                        End Select
+                    'Check and define 207/206 AgeEstimate
+                        Select Case Check207206
+                            Case True
+                                AgeEstimate207206Col = HeaderRange.Find(what:="207Pb/206Pb Age (Ma)", MatchCase:=False, lookat:=xlWhole).Column
+                            Case False
+                        End Select
+                Case "SymNum"
+                    'Check and define U238/Pb206 ratio
+                        Set Ratio238206Col = HeaderRange.Find(what:="U238/Pb206", MatchCase:=False, lookat:=xlWhole)
+                            If Not Ratio238206Col Is Nothing Then
+                            Ratio238206Col = HeaderRange.Find(what:="U238/Pb206", MatchCase:=False).Column
+                            Check238206 = True
+                        Else
+                            Check238206 = False
+                        End If
+                    'Check and define Pb208/Pb206 ratio
+                        Set Ratio208206Col = HeaderRange.Find(what:="Pb208/Pb206", MatchCase:=False, lookat:=xlWhole)
+                        If Not Ratio208206Col Is Nothing Then
+                            Ratio208206Col = HeaderRange.Find(what:="Pb208/Pb206", MatchCase:=False).Column
+                            Check208206 = True
+                        Else
+                            Check208206 = False
+                        End If
+                    'Check and define Pb207/U235 (calc) ratio
+                        Set Ratio207235calcCol = HeaderRange.Find(what:="Pb207/U235(calc)", MatchCase:=False, lookat:=xlWhole)
+                            If Not Ratio207235calcCol Is Nothing Then
+                                Ratio207235calcCol = HeaderRange.Find(what:="Pb207/U235(calc)", MatchCase:=False, lookat:=xlWhole).Column
+                                Check207235calc = True
+                            Else
+                                Check207235calc = False
+                            End If
+                    'Check and define Pb207/U235 ratio
+                        Set Ratio207235Col = HeaderRange.Find(what:="Pb207/U235", MatchCase:=False, lookat:=xlWhole)
+                        If Not Ratio207235Col Is Nothing Then
+                            Ratio207235Col = HeaderRange.Find(what:="Pb207/U235", MatchCase:=False, lookat:=xlWhole).Column
+                            Check207235 = True
+                        Else
+                            Check207235 = False
+                        End If
+                    'Check and define Pb206/U238 ratio
+                        Set Ratio206238Col = HeaderRange.Find(what:="Pb206/U238", MatchCase:=False, lookat:=xlWhole)
+                        If Not Ratio206238Col Is Nothing Then
+                            Ratio206238Col = HeaderRange.Find(what:="Pb206/U238", MatchCase:=False).Column
+                            Check206238 = True
+                        Else
+                            Check206238 = False
+                        End If
+                    'Check and define Pb207/Pb206 ratio
+                        Set Ratio207206Col = HeaderRange.Find(what:="Pb207/Pb206", MatchCase:=False, lookat:=xlWhole)
+                        If Not Ratio207206Col Is Nothing Then
+                            Ratio207206Col = HeaderRange.Find(what:="Pb207/Pb206", MatchCase:=False).Column
+                            Check207206 = True
+                        Else
+                            Check207206 = False
+                        End If
+                    'Check and define Pb207/Pb206 ratio
+                        Set Ratio204206Col = HeaderRange.Find(what:="204Pb/Pb206", MatchCase:=False, lookat:=xlWhole)
+                        If Not Ratio204206Col Is Nothing Then
+                            Ratio204206Col = HeaderRange.Find(what:="204Pb/Pb206", MatchCase:=False).Column
+                            Check204206 = True
+                        Else
+                            Check204206 = False
+                        End If
+                    'Check and define Pb208/Th232 ratio
+                        Set Ratio208232Col = HeaderRange.Find(what:="Pb208/Th232", MatchCase:=False, lookat:=xlWhole)
+                        If Not Ratio208232Col Is Nothing Then
+                            Ratio208232Col = HeaderRange.Find(what:="Pb208/Th232", MatchCase:=False, lookat:=xlWhole).Column
+                            Check208232 = True
+                        Else
+                            Check208232 = False
+                        End If
+                    'Check and define 238/206 AgeEstimate
+                        Select Case Check238206
+                            Case True
+                                AgeEstimate238206Col = HeaderRange.Find(what:="U238/Pb206 Age (Ma)", MatchCase:=False, lookat:=xlWhole).Column
+                            Case False
+                        End Select
+                    'Check and define 207/235 (calc) AgeEstimate
+                        Select Case Check207235calc
+                            Case True
+                                AgeEstimate207235calcCol = HeaderRange.Find(what:="Pb207/U235(calc) Age (Ma)", MatchCase:=False).Column
+                            Case False
+                        End Select
+                    'Check and define 207/235 AgeEstimate
+                        Select Case Check207235
+                            Case True
+                                AgeEstimate207235Col = HeaderRange.Find(what:="Pb207/U235 Age (Ma)", MatchCase:=False).Column
+                            Case False
+                        End Select
+                    'Check and define 206/238 AgeEstimate
+                        Select Case Check206238
+                            Case True
+                                AgeEstimate206238Col = HeaderRange.Find(what:="Pb206/U238 Age (Ma)", MatchCase:=False, lookat:=xlWhole).Column
+                            Case False
+                        End Select
+                    'Check and define 208/232 AgeEstimate
+                        Select Case Check208232
+                            Case True
+                                AgeEstimate208232Col = HeaderRange.Find(what:="Pb208/Th232 Age (Ma)", MatchCase:=False, lookat:=xlWhole).Column
+                            Case False
+                        End Select
+                    'Check and define 207/206 AgeEstimate
+                        Select Case Check207206
+                            Case True
+                                AgeEstimate207206Col = HeaderRange.Find(what:="Pb207/Pb206 Age (Ma)", MatchCase:=False, lookat:=xlWhole).Column
+                            Case False
+                        End Select
+            End Select
+            'Check required ratios
+                Select Case ConcordiaPlotType
+                Case "Wetherill"
+                    If Check206238 = False Or Check207206 = False Then
+                        GoTo MissingRequiredRatio
+                    ElseIf Check207235calc = True Or Check207235 = True Then
+                        GoTo SelEnd
                     Else
-                        Check207235calc = False
+                        GoTo MissingRequiredRatio
                     End If
-            'Check and define Pb207/U235 ratio
-                Set Ratio207235Col = HeaderRange.Find(what:="207Pb/235U", MatchCase:=False, lookat:=xlWhole)
-                If Not Ratio207235Col Is Nothing Then
-                    Ratio207235Col = HeaderRange.Find(what:="207Pb/235U", MatchCase:=False, lookat:=xlWhole).Column
-                    Check207235 = True
-                Else
-                    Check207235 = False
-                End If
-            'Check and define Pb206/U238 ratio
-                Set Ratio206238Col = HeaderRange.Find(what:="206Pb/238U", MatchCase:=False, lookat:=xlWhole)
-                If Not Ratio206238Col Is Nothing Then
-                    Ratio206238Col = HeaderRange.Find(what:="206Pb/238U", MatchCase:=False).Column
-                    Check206238 = True
-                Else
-                    Check206238 = False
-                End If
-            'Check and define Pb207/Pb206 ratio
-                Set Ratio207206Col = HeaderRange.Find(what:="207Pb/206Pb", MatchCase:=False, lookat:=xlWhole)
-                If Not Ratio207206Col Is Nothing Then
-                    Ratio207206Col = HeaderRange.Find(what:="207Pb/206Pb", MatchCase:=False).Column
-                    Check207206 = True
-                Else
-                    Check207206 = False
-                End If
-            'Check and define Pb207/Pb206 ratio
-                Set Ratio204206Col = HeaderRange.Find(what:="204Pb/206Pb", MatchCase:=False, lookat:=xlWhole)
-                If Not Ratio204206Col Is Nothing Then
-                    Ratio204206Col = HeaderRange.Find(what:="204Pb/206Pb", MatchCase:=False).Column
-                    Check204206 = True
-                Else
-                    Check204206 = False
-                End If
-            'Check and define Pb208/Th232 ratio
-                Set Ratio208232Col = HeaderRange.Find(what:="208Pb/232Th", MatchCase:=False, lookat:=xlWhole)
-                If Not Ratio208232Col Is Nothing Then
-                    Ratio208232Col = HeaderRange.Find(what:="208Pb/232Th", MatchCase:=False, lookat:=xlWhole).Column
-                    Check208232 = True
-                Else
-                    Check208232 = False
-                End If
-            'Check and define 238/206 AgeEstimate
-                Select Case Check238206
-                    Case True
-                        AgeEstimate238206Col = HeaderRange.Find(what:="238U/206Pb Age (Ma)", MatchCase:=False, lookat:=xlWhole).Column
-                    Case False
-                End Select
-            'Check and define 207/235 (calc) AgeEstimate
-                Select Case Check207235calc
-                    Case True
-                        AgeEstimate207235calcCol = HeaderRange.Find(what:="207Pb/235U(calc) Age (Ma)", MatchCase:=False).Column
-                    Case False
-                End Select
-            'Check and define 207/235 AgeEstimate
-                Select Case Check207235
-                    Case True
-                        AgeEstimate207235Col = HeaderRange.Find(what:="207Pb/235U Age (Ma)", MatchCase:=False).Column
-                    Case False
-                End Select
-            'Check and define 206/238 AgeEstimate
-                Select Case Check206238
-                    Case True
-                        AgeEstimate206238Col = HeaderRange.Find(what:="206Pb/238U Age (Ma)", MatchCase:=False, lookat:=xlWhole).Column
-                    Case False
-                End Select
-            'Check and define 208/232 AgeEstimate
-                Select Case Check208232
-                    Case True
-                        AgeEstimate208232Col = HeaderRange.Find(what:="208Pb/232Th Age (Ma)", MatchCase:=False, lookat:=xlWhole).Column
-                    Case False
-                End Select
-            'Check and define 207/206 AgeEstimate
-                Select Case Check207206
-                    Case True
-                        AgeEstimate207206Col = HeaderRange.Find(what:="207Pb/206Pb Age (Ma)", MatchCase:=False, lookat:=xlWhole).Column
-                    Case False
-                End Select
+                Case "TeraWasserburg"
+                    If Check238206 = False Or Check207206 = False Then
+                        GoTo MissingRequiredRatio
+                    End If
+SelEnd:         End Select
             'Check and define error correlations
                 Set Rho206Pb238Uvs207Pb235UCol = HeaderRange.Find(what:="Rho: 206/238 vs 207/235", MatchCase:=False, lookat:=xlWhole)
-                    If Not Rho206Pb238Uvs207Pb235UCol Is Nothing Then
-                        RhoCalc = False
-                        Rho206Pb238Uvs207Pb235UCol = HeaderRange.Find(what:="Rho: 206/238 vs 207/235", MatchCase:=False, lookat:=xlWhole).Column
-                    ElseIf SignalPrecision = True Then
-                        RhoCalc = True
-                    Else
-                        RhoCalc = False
-                    End If
+                If Not Rho206Pb238Uvs207Pb235UCol Is Nothing Then
+                    RhoCalc = False
+                    Rho206Pb238Uvs207Pb235UCol = HeaderRange.Find(what:="Rho: 206/238 vs 207/235", MatchCase:=False, lookat:=xlWhole).Column
+                ElseIf SignalPrecision = True Then
+                    RhoCalc = True
+                Else
+                    RhoCalc = False
+                End If
                 Set Rho207Pb206Pbvs238U206PbCol = HeaderRange.Find(what:="Rho: 207/206 vs 238/206", MatchCase:=False, lookat:=xlWhole)
                 If Not Rho207Pb206Pbvs238U206PbCol Is Nothing Then
                     Rho207Pb206Pbvs238U206PbCol = HeaderRange.Find(what:="Rho: 207/206 vs 238/206", MatchCase:=False, lookat:=xlWhole).Column
@@ -466,10 +594,12 @@ Start:
         Sheets("Original Data").Activate
     'Copy AL#, sample name and analysis number
         Range(Cells(ODStartRowA, ALNumCol), Cells(ODLastRowA, ALNumCol)).Copy Destination:=Sheets("Geochronology Data").Range("A1")
+        Sheets("Geochronology Data").Range("A1").Value = "ALnum"
         Range(Cells(ODStartRowA, SampleCol), Cells(ODLastRowA, AnalysisCol)).Copy Destination:=Sheets("Geochronology Data").Range("B1")
         Select Case TraceElementDataPresent
             Case True
                 Range(Cells(ODStartRowA, ALNumCol), Cells(ODLastRowA, ALNumCol)).Copy Destination:=Sheets("Elemental Data").Range("A1")
+                Sheets("Elemental Data").Range("A1").Value = "ALnum"
                 Range(Cells(ODStartRowA, SampleCol), Cells(ODLastRowA, AnalysisCol)).Copy Destination:=Sheets("Elemental Data").Range("B1")
             Case False
         End Select
@@ -478,10 +608,12 @@ Start:
             Case True
                 EDLastCol = Sheets("Elemental Data").Cells(1, Columns.Count).End(xlToLeft).Column
                 EDNextCol = EDLastCol + 1
+                Range(Cells(ODStartRowA, ElementTotalCol), Cells(ODLastRowA, ElementTotalCol)).Copy Destination:=Sheets("Elemental Data").Cells(1, EDNextCol)
+                EDNextCol = EDNextCol + 1
                 For n = EleStartCol To EleEndCol
                     Range(Cells(ODStartRowA, n), Cells(ODLastRowA, n)).Copy Destination:=Sheets("Elemental Data").Cells(1, EDNextCol)
                     EDNextCol = EDNextCol + 1
-                    Sheets("Elemental Data").Cells(1, EDNextCol).Value = Sheets("Elemental Data").Cells(1, EDNextCol - 1).Value & " " & StandardErrorLevel & "SE"
+                    Sheets("Elemental Data").Cells(1, EDNextCol).Value = Sheets("Elemental Data").Cells(1, EDNextCol - 1).Value & "_" & StandardErrorLevel & "SE"
                     Range(Cells(ODStartRowB, n), Cells(ODLastRowB, n)).Copy Destination:=Sheets("Elemental Data").Cells(2, EDNextCol)
                     EDNextCol = EDNextCol + 1
                 Next n
@@ -494,111 +626,128 @@ Start:
             GDLastCol = Sheets("Geochronology Data").Cells(1, Columns.Count).End(xlToLeft).Column
             GDNextCol = GDLastCol + 1
             GDLastRow = Sheets("Geochronology Data").Cells(Rows.Count, 1).End(xlUp).Row
-    Select Case ConcordiaPlotType 'arrange ratios, ratio uncertainties, age estimates, age estimate uncertainties, copy/calculation of error correlations, calculations of concordance based on prefered output type for concordia plot
-        Case "Wetherill" '(Wetherill format)
-            'Copy ratios and uncertainties, label uncertainty columns
+        'Copy ratios and uncertainties, label uncertainty columns
+        'arrange ratios, ratio uncertainties, age estimates, age estimate uncertainties, copy/calculation of error correlations, calculations of concordance based on prefered output type for concordia plot
+            Select Case ConcordiaPlotType
+                Case "Wetherill"
                 '238/206 ratio
+                Select Case Check238206
+                    Case True
+                        Range(Cells(ODStartRowA, Ratio238206Col), Cells(ODLastRowA, Ratio238206Col)).Copy Destination:=Sheets("Geochronology Data").Cells(1, GDNextCol)
+                        Sheets("Geochronology Data").Cells(1, GDNextCol).Value = "U238Pb206"
+                        RCIndexRatio238206 = GDNextCol
+                        GDNextCol = GDNextCol + 1
+                        Sheets("Geochronology Data").Cells(1, GDNextCol).Value = "U238Pb206_" & StandardErrorLevel & "SE"
+                        Range(Cells(ODStartRowB, Ratio238206Col), Cells(ODLastRowB, Ratio238206Col)).Copy Destination:=Sheets("Geochronology Data").Cells(2, GDNextCol)
+                        GDNextCol = GDNextCol + 1
+                    Case False
+                End Select
+            End Select
+            '208/206 ratio
+                Select Case Check208206
+                    Case True
+                        Range(Cells(ODStartRowA, Ratio208206Col), Cells(ODLastRowA, Ratio208206Col)).Copy Destination:=Sheets("Geochronology Data").Cells(1, GDNextCol)
+                        Sheets("Geochronology Data").Cells(1, GDNextCol).Value = "Pb208Pb206"
+                        GDNextCol = GDNextCol + 1
+                        Sheets("Geochronology Data").Cells(1, GDNextCol).Value = "Pb208Pb206_" & StandardErrorLevel & "SE"
+                        Range(Cells(ODStartRowB, Ratio208206Col), Cells(ODLastRowB, Ratio208206Col)).Copy Destination:=Sheets("Geochronology Data").Cells(2, GDNextCol)
+                        GDNextCol = GDNextCol + 1
+                    Case False
+                End Select
+            '204/206 ratio
+                Select Case Check204206
+                    Case True
+                        Range(Cells(ODStartRowA, Ratio204206Col), Cells(ODLastRowA, Ratio204206Col)).Copy Destination:=Sheets("Geochronology Data").Cells(1, GDNextCol)
+                        Sheets("Geochronology Data").Cells(1, GDNextCol).Value = "Pb204Pb206"
+                        GDNextCol = GDNextCol + 1
+                        Sheets("Geochronology Data").Cells(1, GDNextCol).Value = "Pb204Pb206_" & StandardErrorLevel & "SE"
+                        Range(Cells(ODStartRowB, Ratio204206Col), Cells(ODLastRowB, Ratio204206Col)).Copy Destination:=Sheets("Geochronology Data").Cells(2, GDNextCol)
+                        GDNextCol = GDNextCol + 1
+                    Case False
+                End Select
+            '208/232 ratio
+                Select Case Check208232
+                    Case True
+                        Range(Cells(ODStartRowA, Ratio208232Col), Cells(ODLastRowA, Ratio208232Col)).Copy Destination:=Sheets("Geochronology Data").Cells(1, GDNextCol)
+                        Sheets("Geochronology Data").Cells(1, GDNextCol).Value = "Pb208Th232"
+                        GDNextCol = GDNextCol + 1
+                        Sheets("Geochronology Data").Cells(1, GDNextCol).Value = "Pb208Th232_" & StandardErrorLevel & "SE"
+                        Range(Cells(ODStartRowB, Ratio208232Col), Cells(ODLastRowB, Ratio208232Col)).Copy Destination:=Sheets("Geochronology Data").Cells(2, GDNextCol)
+                        GDNextCol = GDNextCol + 1
+                    Case False
+                End Select
+            '207/235 (calc)
+                Select Case Check207235calc
+                    Case True
+                        Range(Cells(ODStartRowA, Ratio207235calcCol), Cells(ODLastRowA, Ratio207235calcCol)).Copy Destination:=Sheets("Geochronology Data").Cells(1, GDNextCol)
+                        Sheets("Geochronology Data").Cells(1, GDNextCol).Value = "Pb207U235_calc"
+                        GDNextCol = GDNextCol + 1
+                        Sheets("Geochronology Data").Cells(1, GDNextCol).Value = "Pb207U235_calc_" & StandardErrorLevel & "SE"
+                        Range(Cells(ODStartRowB, Ratio207235calcCol), Cells(ODLastRowB, Ratio207235calcCol)).Copy Destination:=Sheets("Geochronology Data").Cells(2, GDNextCol)
+                        GDNextCol = GDNextCol + 1
+                    Case False
+                End Select
+            '207/235 ratio
+                Select Case Check207235
+                    Case True
+                        Range(Cells(ODStartRowA, Ratio207235Col), Cells(ODLastRowA, Ratio207235Col)).Copy Destination:=Sheets("Geochronology Data").Cells(1, GDNextCol)
+                        Sheets("Geochronology Data").Cells(1, GDNextCol).Value = "Pb207U235"
+                        GDNextCol = GDNextCol + 1
+                        Sheets("Geochronology Data").Cells(1, GDNextCol).Value = "Pb207U235_" & StandardErrorLevel & "SE"
+                        Range(Cells(ODStartRowB, Ratio207235Col), Cells(ODLastRowB, Ratio207235Col)).Copy Destination:=Sheets("Geochronology Data").Cells(2, GDNextCol)
+                        GDNextCol = GDNextCol + 1
+                    Case False
+                End Select
+            '206/238 ratio
+                Select Case Check206238
+                    Case True
+                        Range(Cells(ODStartRowA, Ratio206238Col), Cells(ODLastRowA, Ratio206238Col)).Copy Destination:=Sheets("Geochronology Data").Cells(1, GDNextCol)
+                        Sheets("Geochronology Data").Cells(1, GDNextCol).Value = "Pb206U238"
+                        Select Case Check238206
+                            Case False
+                                RCIndexRatio238206 = GDNextCol
+                            Case True
+                        End Select
+                        GDNextCol = GDNextCol + 1
+                        Sheets("Geochronology Data").Cells(1, GDNextCol).Value = "Pb206U238_" & StandardErrorLevel & "SE"
+                        Range(Cells(ODStartRowB, Ratio206238Col), Cells(ODLastRowB, Ratio206238Col)).Copy Destination:=Sheets("Geochronology Data").Cells(2, GDNextCol)
+                        GDNextCol = GDNextCol + 1
+                    Case False
+                End Select
+            Select Case ConcordiaPlotType
+                Case "TeraWasserburg"
+                    '238/206 ratio
                     Select Case Check238206
                         Case True
                             Range(Cells(ODStartRowA, Ratio238206Col), Cells(ODLastRowA, Ratio238206Col)).Copy Destination:=Sheets("Geochronology Data").Cells(1, GDNextCol)
+                            Sheets("Geochronology Data").Cells(1, GDNextCol).Value = "U238Pb206"
                             RCIndexRatio238206 = GDNextCol
                             GDNextCol = GDNextCol + 1
-                            Sheets("Geochronology Data").Cells(1, GDNextCol).Value = "Uncertainty[38/06] " & StandardErrorLevel & "SE"
+                            Sheets("Geochronology Data").Cells(1, GDNextCol).Value = "U238Pb206_" & StandardErrorLevel & "SE"
                             Range(Cells(ODStartRowB, Ratio238206Col), Cells(ODLastRowB, Ratio238206Col)).Copy Destination:=Sheets("Geochronology Data").Cells(2, GDNextCol)
                             GDNextCol = GDNextCol + 1
                         Case False
                     End Select
-                '208/206 ratio
-                    Select Case Check208206
-                        Case True
-                            Range(Cells(ODStartRowA, Ratio208206Col), Cells(ODLastRowA, Ratio208206Col)).Copy Destination:=Sheets("Geochronology Data").Cells(1, GDNextCol)
-                            GDNextCol = GDNextCol + 1
-                            Sheets("Geochronology Data").Cells(1, GDNextCol).Value = "Uncertainty[08/06] " & StandardErrorLevel & "SE"
-                            Range(Cells(ODStartRowB, Ratio208206Col), Cells(ODLastRowB, Ratio208206Col)).Copy Destination:=Sheets("Geochronology Data").Cells(2, GDNextCol)
-                            GDNextCol = GDNextCol + 1
-                        Case False
-                    End Select
-                '204/206 ratio
-                    Select Case Check204206
-                        Case True
-                            Range(Cells(ODStartRowA, Ratio204206Col), Cells(ODLastRowA, Ratio204206Col)).Copy Destination:=Sheets("Geochronology Data").Cells(1, GDNextCol)
-                            GDNextCol = GDNextCol + 1
-                            Sheets("Geochronology Data").Cells(1, GDNextCol).Value = "Uncertainty[04/06] " & StandardErrorLevel & "SE"
-                            Range(Cells(ODStartRowB, Ratio204206Col), Cells(ODLastRowB, Ratio204206Col)).Copy Destination:=Sheets("Geochronology Data").Cells(2, GDNextCol)
-                            GDNextCol = GDNextCol + 1
-                        Case False
-                    End Select
-                '208/232 ratio
-                    Select Case Check208232
-                        Case True
-                            Range(Cells(ODStartRowA, Ratio208232Col), Cells(ODLastRowA, Ratio208232Col)).Copy Destination:=Sheets("Geochronology Data").Cells(1, GDNextCol)
-                            GDNextCol = GDNextCol + 1
-                            Sheets("Geochronology Data").Cells(1, GDNextCol).Value = "Uncertainty[08/32] " & StandardErrorLevel & "SE"
-                            Range(Cells(ODStartRowB, Ratio208232Col), Cells(ODLastRowB, Ratio208232Col)).Copy Destination:=Sheets("Geochronology Data").Cells(2, GDNextCol)
-                            GDNextCol = GDNextCol + 1
-                        Case False
-                    End Select
-                '207/235 (calc) ratio (one 207/235 variant is required for Wetherill format)
-                    Select Case Check207235calc
-                        Case True
-                            Range(Cells(ODStartRowA, Ratio207235calcCol), Cells(ODLastRowA, Ratio207235calcCol)).Copy Destination:=Sheets("Geochronology Data").Cells(1, GDNextCol)
-                            GDNextCol = GDNextCol + 1
-                            Sheets("Geochronology Data").Cells(1, GDNextCol).Value = "Uncertainty[07/35](calc) " & StandardErrorLevel & "SE"
-                            Range(Cells(ODStartRowB, Ratio207235calcCol), Cells(ODLastRowB, Ratio207235calcCol)).Copy Destination:=Sheets("Geochronology Data").Cells(2, GDNextCol)
-                            GDNextCol = GDNextCol + 1
-                        Case False
-                            If Check207235 = False Then
-                            GoTo MissingRequiredRatio
-                            Else
-                            End If
-                    End Select
-                '207/235 ratio (one 207/235 variant is required for Wetherill format)
-                    Select Case Check207235
-                        Case True
-                            Range(Cells(ODStartRowA, Ratio207235Col), Cells(ODLastRowA, Ratio207235Col)).Copy Destination:=Sheets("Geochronology Data").Cells(1, GDNextCol)
-                            GDNextCol = GDNextCol + 1
-                            Sheets("Geochronology Data").Cells(1, GDNextCol).Value = "Uncertainty[07/35] " & StandardErrorLevel & "SE"
-                            Range(Cells(ODStartRowB, Ratio207235Col), Cells(ODLastRowB, Ratio207235Col)).Copy Destination:=Sheets("Geochronology Data").Cells(2, GDNextCol)
-                            GDNextCol = GDNextCol + 1
-                        Case False
-                            If Check207235calc = False Then
-                            GoTo MissingRequiredRatio
-                            Else
-                            End If
-                    End Select
-                '206/238 ratio (required for Wetherill format)
-                    Select Case Check206238
-                        Case True
-                            Range(Cells(ODStartRowA, Ratio206238Col), Cells(ODLastRowA, Ratio206238Col)).Copy Destination:=Sheets("Geochronology Data").Cells(1, GDNextCol)
-                            Select Case Check238206
-                                Case False
-                                    RCIndexRatio238206 = GDNextCol
-                                Case True
-                            End Select
-                            GDNextCol = GDNextCol + 1
-                            Sheets("Geochronology Data").Cells(1, GDNextCol).Value = "Uncertainty[06/38] " & StandardErrorLevel & "SE"
-                            Range(Cells(ODStartRowB, Ratio206238Col), Cells(ODLastRowB, Ratio206238Col)).Copy Destination:=Sheets("Geochronology Data").Cells(2, GDNextCol)
-                            GDNextCol = GDNextCol + 1
-                        Case False
-                            GoTo MissingRequiredRatio
-                    End Select
-                '207/206 ratio (required for Wetherill format)
-                    Select Case Check207206
-                        Case True
-                            Range(Cells(ODStartRowA, Ratio207206Col), Cells(ODLastRowA, Ratio207206Col)).Copy Destination:=Sheets("Geochronology Data").Cells(1, GDNextCol)
-                            RCIndexRatio207206 = GDNextCol
-                            GDNextCol = GDNextCol + 1
-                            Sheets("Geochronology Data").Cells(1, GDNextCol).Value = "Uncertainty[07/06] " & StandardErrorLevel & "SE"
-                            Range(Cells(ODStartRowB, Ratio207206Col), Cells(ODLastRowB, Ratio207206Col)).Copy Destination:=Sheets("Geochronology Data").Cells(2, GDNextCol)
-                            GDNextCol = GDNextCol + 1
-                        Case False
-                            GoTo MissingRequiredRatio
-                    End Select
-            'Copy/calculate error correlation (rho), approximations based on the mathematics of Schmitz et al 2007
+                End Select
+            '207/206 ratio
+                Select Case Check207206
+                    Case True
+                        Range(Cells(ODStartRowA, Ratio207206Col), Cells(ODLastRowA, Ratio207206Col)).Copy Destination:=Sheets("Geochronology Data").Cells(1, GDNextCol)
+                        Sheets("Geochronology Data").Cells(1, GDNextCol).Value = "Pb207Pb206"
+                        RCIndexRatio207206 = GDNextCol
+                        GDNextCol = GDNextCol + 1
+                        Sheets("Geochronology Data").Cells(1, GDNextCol).Value = "Pb207Pb206_" & StandardErrorLevel & "SE"
+                        Range(Cells(ODStartRowB, Ratio207206Col), Cells(ODLastRowB, Ratio207206Col)).Copy Destination:=Sheets("Geochronology Data").Cells(2, GDNextCol)
+                        GDNextCol = GDNextCol + 1
+                    Case False
+                End Select
+        'Copy/calculate error correlation (rho), approximations based on the mathematics of Schmitz et al 2007
+            Select Case ConcordiaPlotType
+                Case "Wetherill"
                 'Write headers, shift back to original position for rest of function
-                    Sheets("Geochronology Data").Cells(1, GDNextCol).Value = "Rho[206/238][207/235]"
+                    Sheets("Geochronology Data").Cells(1, GDNextCol).Value = "Rho_Pb206U238_Pb207U235"
                     GDNextCol = GDNextCol + 1
-                    Sheets("Geochronology Data").Cells(1, GDNextCol).Value = "Rho[207/206][206/238]"
+                    Sheets("Geochronology Data").Cells(1, GDNextCol).Value = "Rho_Pb207Pb206_Pb206U238"
                     GDNextCol = GDNextCol - 1
                 'Dynamic determination of copy/calculate error correlation (rho)
                     Select Case RhoCalc
@@ -651,197 +800,8 @@ Start:
                                 End If
                             End If
                     End Select
-            'Copy age estimates and uncertainties, label uncertainty columns
-                '238/206 age estimate
-                    Select Case Check238206
-                        Case True
-                            Range(Cells(ODStartRowA, AgeEstimate238206Col), Cells(ODLastRowA, AgeEstimate238206Col)).Copy Destination:=Sheets("Geochronology Data").Cells(1, GDNextCol)
-                            GDNextCol = GDNextCol + 1
-                            Sheets("Geochronology Data").Cells(1, GDNextCol).Value = "Uncertainty[38/06] " & StandardErrorLevel & "SE"
-                            Range(Cells(ODStartRowB, AgeEstimate238206Col), Cells(ODLastRowB, AgeEstimate238206Col)).Copy Destination:=Sheets("Geochronology Data").Cells(2, GDNextCol)
-                            GDNextCol = GDNextCol + 1
-                        Case False
-                    End Select
-                '208/232 age estimate
-                    Select Case Check208232
-                        Case True
-                            Range(Cells(ODStartRowA, AgeEstimate208232Col), Cells(ODLastRowA, AgeEstimate208232Col)).Copy Destination:=Sheets("Geochronology Data").Cells(1, GDNextCol)
-                            GDNextCol = GDNextCol + 1
-                            Sheets("Geochronology Data").Cells(1, GDNextCol).Value = "Uncertainty[08/32] " & StandardErrorLevel & "SE"
-                            Range(Cells(ODStartRowB, AgeEstimate208232Col), Cells(ODLastRowB, AgeEstimate208232Col)).Copy Destination:=Sheets("Geochronology Data").Cells(2, GDNextCol)
-                            GDNextCol = GDNextCol + 1
-                        Case False
-                    End Select
-                '207/235 (calc) age estimate (one 207/235 variant is required for Wetherill Format)
-                    Select Case Check207235calc
-                        Case True
-                            Range(Cells(ODStartRowA, AgeEstimate207235calcCol), Cells(ODLastRowA, AgeEstimate207235calcCol)).Copy Destination:=Sheets("Geochronology Data").Cells(1, GDNextCol)
-                            GDNextCol = GDNextCol + 1
-                            Sheets("Geochronology Data").Cells(1, GDNextCol).Value = "Uncertainty[07/35](calc) " & StandardErrorLevel & "SE"
-                            Range(Cells(ODStartRowB, AgeEstimate207235calcCol), Cells(ODLastRowB, AgeEstimate207235calcCol)).Copy Destination:=Sheets("Geochronology Data").Cells(2, GDNextCol)
-                            GDNextCol = GDNextCol + 1
-                        Case False
-                            If Check207235 = False Then
-                            GoTo MissingRequiredAgeEstimate
-                            Else
-                            End If
-                    End Select
-                '207/235 age estimate (one 207/235 variant is required for Wetherill Format)
-                    Select Case Check207235
-                        Case True
-                            Range(Cells(ODStartRowA, AgeEstimate207235Col), Cells(ODLastRowA, AgeEstimate207235Col)).Copy Destination:=Sheets("Geochronology Data").Cells(1, GDNextCol)
-                            GDNextCol = GDNextCol + 1
-                            Sheets("Geochronology Data").Cells(1, GDNextCol).Value = "Uncertainty[07/35] " & StandardErrorLevel & "SE"
-                            Range(Cells(ODStartRowB, AgeEstimate207235Col), Cells(ODLastRowB, AgeEstimate207235Col)).Copy Destination:=Sheets("Geochronology Data").Cells(2, GDNextCol)
-                            GDNextCol = GDNextCol + 1
-                        Case False
-                            If Check207235calc = False Then
-                            GoTo MissingRequiredAgeEstimate
-                            Else
-                            End If
-                    End Select
-                '206/238 age estimate (required for Wetherill format)
-                    Select Case Check206238
-                        Case True
-                            Range(Cells(ODStartRowA, AgeEstimate206238Col), Cells(ODLastRowA, AgeEstimate206238Col)).Copy Destination:=Sheets("Geochronology Data").Cells(1, GDNextCol)
-                            RCIndexAge206238 = GDNextCol
-                            GDNextCol = GDNextCol + 1
-                            Sheets("Geochronology Data").Cells(1, GDNextCol).Value = "Uncertainty[06/38] " & StandardErrorLevel & "SE"
-                            Range(Cells(ODStartRowB, AgeEstimate206238Col), Cells(ODLastRowB, AgeEstimate206238Col)).Copy Destination:=Sheets("Geochronology Data").Cells(2, GDNextCol)
-                            GDNextCol = GDNextCol + 1
-                        Case False
-                            GoTo MissingRequiredAgeEstimate
-                    End Select
-                '207/206 age estimate required for Wetherill format)
-                    Select Case Check207206
-                        Case True
-                            Range(Cells(ODStartRowA, AgeEstimate207206Col), Cells(ODLastRowA, AgeEstimate207206Col)).Copy Destination:=Sheets("Geochronology Data").Cells(1, GDNextCol)
-                            RCIndexAge207206 = GDNextCol
-                            GDNextCol = GDNextCol + 1
-                            Sheets("Geochronology Data").Cells(1, GDNextCol).Value = "Uncertainty[07/06] " & StandardErrorLevel & "SE"
-                            Range(Cells(ODStartRowB, AgeEstimate207206Col), Cells(ODLastRowB, AgeEstimate207206Col)).Copy Destination:=Sheets("Geochronology Data").Cells(2, GDNextCol)
-                            GDNextCol = GDNextCol + 1
-                        Case False
-                            GoTo MissingRequiredAgeEstimate
-                    End Select
-            'Concordance calculations
-                Sheets("Geochronology Data").Activate
-                    With ActiveSheet
-                        '[06/38][07/06]
-                            Cells(1, GDNextCol).Value = "Concordance [06/38][07/06]"
-                            Range(Cells(2, GDNextCol), Cells(GDLastRow, GDNextCol)).FormulaR1C1 = "=ROUND((RC[-4]/RC[-2])*100,0)"
-                            GDNextCol = GDNextCol + 1
-                        '[06/38][07/35]
-                            Cells(1, GDNextCol).Value = "Concordance [06/38][07/35]"
-                            Range(Cells(2, GDNextCol), Cells(GDLastRow, GDNextCol)).FormulaR1C1 = "=ROUND((RC[-5]/RC[-7])*100,0)"
-                            GDNextCol = GDNextCol + 1
-                        '[07/35][07/06]
-                            Cells(1, GDNextCol).Value = "Concordance [07/35][07/06]"
-                            Range(Cells(2, GDNextCol), Cells(GDLastRow, GDNextCol)).FormulaR1C1 = "=ROUND((RC[-8]/RC[-4])*100,0)"
-                            GDNextCol = GDNextCol + 1
-                        'Logratio Distance (Aitchison Distance)
-                            Cells(1, GDNextCol).Value = "Concordance [logratio distance]"
-                            RCIndexRatio207206 = RCIndexRatio207206 - GDNextCol
-                            RCIndexRatio238206 = RCIndexRatio238206 - GDNextCol
-                            RCIndexAge206238 = RCIndexAge206238 - GDNextCol
-                            RCIndexAge207206 = RCIndexAge207206 - GDNextCol
-                            Select Case Check238206
-                                Case True
-                                    Range(Cells(2, GDNextCol), Cells(GDLastRow, GDNextCol)).FormulaR1C1 = "=100*(LN(RC[" & RCIndexRatio238206 & "])-LN(EXP(0.000155125*RC[" & RCIndexAge207206 & "])-1))*SIN(ATAN((LN(RC[" & RCIndexRatio207206 & "])-LN((1/137.818)*(EXP(0.00098485*RC[" & RCIndexAge206238 & "])-1)/(EXP(0.000155125*RC[" & RCIndexAge206238 & "])-1)))/(LN(RC[" & RCIndexRatio238206 & "])-LN(EXP(0.000155125*RC[" & RCIndexAge207206 & "])-1))))"
-                                    GDNextCol = GDNextCol + 1
-                                Case False
-                                    Range(Cells(2, GDNextCol), Cells(GDLastRow, GDNextCol)).FormulaR1C1 = "=100*(LN(1/RC[" & RCIndexRatio238206 & "])-LN(EXP(0.000155125*RC[" & RCIndexAge207206 & "])-1))*SIN(ATAN((LN(RC[" & RCIndexRatio207206 & "])-LN((1/137.818)*(EXP(0.00098485*RC[" & RCIndexAge206238 & "])-1)/(EXP(0.000155125*RC[" & RCIndexAge206238 & "])-1)))/(LN(1/RC[" & RCIndexRatio238206 & "])-LN(EXP(0.000155125*RC[" & RCIndexAge207206 & "])-1))))"
-                                    GDNextCol = GDNextCol + 1
-                            End Select
-                    End With
-        Case "TeraWasserburg" '(TeraWasserburg Format)
-            'Copy ratios and uncertainties, label uncertainty columns
-                '208/206 ratio
-                    Select Case Check208206
-                        Case True
-                            Range(Cells(ODStartRowA, Ratio208206Col), Cells(ODLastRowA, Ratio208206Col)).Copy Destination:=Sheets("Geochronology Data").Cells(1, GDNextCol)
-                            GDNextCol = GDNextCol + 1
-                            Sheets("Geochronology Data").Cells(1, GDNextCol).Value = "Uncertainty[08/06] " & StandardErrorLevel & "SE"
-                            Range(Cells(ODStartRowB, Ratio208206Col), Cells(ODLastRowB, Ratio208206Col)).Copy Destination:=Sheets("Geochronology Data").Cells(2, GDNextCol)
-                            GDNextCol = GDNextCol + 1
-                        Case False
-                    End Select
-                '204/206 ratio
-                    Select Case Check204206
-                        Case True
-                            Range(Cells(ODStartRowA, Ratio204206Col), Cells(ODLastRowA, Ratio204206Col)).Copy Destination:=Sheets("Geochronology Data").Cells(1, GDNextCol)
-                            GDNextCol = GDNextCol + 1
-                            Sheets("Geochronology Data").Cells(1, GDNextCol).Value = "Uncertainty[04/06] " & StandardErrorLevel & "SE"
-                            Range(Cells(ODStartRowB, Ratio204206Col), Cells(ODLastRowB, Ratio204206Col)).Copy Destination:=Sheets("Geochronology Data").Cells(2, GDNextCol)
-                            GDNextCol = GDNextCol + 1
-                        Case False
-                    End Select
-                '208/232 ratio
-                    Select Case Check208232
-                        Case True
-                            Range(Cells(ODStartRowA, Ratio208232Col), Cells(ODLastRowA, Ratio208232Col)).Copy Destination:=Sheets("Geochronology Data").Cells(1, GDNextCol)
-                            GDNextCol = GDNextCol + 1
-                            Sheets("Geochronology Data").Cells(1, GDNextCol).Value = "Uncertainty[08/32] " & StandardErrorLevel & "SE"
-                            Range(Cells(ODStartRowB, Ratio208232Col), Cells(ODLastRowB, Ratio208232Col)).Copy Destination:=Sheets("Geochronology Data").Cells(2, GDNextCol)
-                            GDNextCol = GDNextCol + 1
-                        Case False
-                    End Select
-                '207/235 (calc) ratio
-                    Select Case Check207235calc
-                        Case True
-                            Range(Cells(ODStartRowA, Ratio207235calcCol), Cells(ODLastRowA, Ratio207235calcCol)).Copy Destination:=Sheets("Geochronology Data").Cells(1, GDNextCol)
-                            GDNextCol = GDNextCol + 1
-                            Sheets("Geochronology Data").Cells(1, GDNextCol).Value = "Uncertainty[07/35](calc) " & StandardErrorLevel & "SE"
-                            Range(Cells(ODStartRowB, Ratio207235calcCol), Cells(ODLastRowB, Ratio207235calcCol)).Copy Destination:=Sheets("Geochronology Data").Cells(2, GDNextCol)
-                            GDNextCol = GDNextCol + 1
-                        Case False
-                    End Select
-                '207/235 ratio
-                    Select Case Check207235
-                        Case True
-                            Range(Cells(ODStartRowA, Ratio207235Col), Cells(ODLastRowA, Ratio207235Col)).Copy Destination:=Sheets("Geochronology Data").Cells(1, GDNextCol)
-                            GDNextCol = GDNextCol + 1
-                            Sheets("Geochronology Data").Cells(1, GDNextCol).Value = "Uncertainty[07/35] " & StandardErrorLevel & "SE"
-                            Range(Cells(ODStartRowB, Ratio207235Col), Cells(ODLastRowB, Ratio207235Col)).Copy Destination:=Sheets("Geochronology Data").Cells(2, GDNextCol)
-                            GDNextCol = GDNextCol + 1
-                        Case False
-                    End Select
-                '206/238 ratio
-                    Select Case Check206238
-                        Case True
-                            Range(Cells(ODStartRowA, Ratio206238Col), Cells(ODLastRowA, Ratio206238Col)).Copy Destination:=Sheets("Geochronology Data").Cells(1, GDNextCol)
-                            GDNextCol = GDNextCol + 1
-                            Sheets("Geochronology Data").Cells(1, GDNextCol).Value = "Uncertainty[06/38] " & StandardErrorLevel & "SE"
-                            Range(Cells(ODStartRowB, Ratio206238Col), Cells(ODLastRowB, Ratio206238Col)).Copy Destination:=Sheets("Geochronology Data").Cells(2, GDNextCol)
-                            GDNextCol = GDNextCol + 1
-                        Case False
-                    End Select
-                '238/206 ratio (required for Tera-Wasserburg format)
-                    Select Case Check238206
-                        Case True
-                            Range(Cells(ODStartRowA, Ratio238206Col), Cells(ODLastRowA, Ratio238206Col)).Copy Destination:=Sheets("Geochronology Data").Cells(1, GDNextCol)
-                            RCIndexRatio238206 = GDNextCol
-                            GDNextCol = GDNextCol + 1
-                            Sheets("Geochronology Data").Cells(1, GDNextCol).Value = "Uncertainty[38/06] " & StandardErrorLevel & "SE"
-                            Range(Cells(ODStartRowB, Ratio238206Col), Cells(ODLastRowB, Ratio238206Col)).Copy Destination:=Sheets("Geochronology Data").Cells(2, GDNextCol)
-                            GDNextCol = GDNextCol + 1
-                        Case False
-                            GoTo MissingRequiredRatio
-                    End Select
-                '207/206 ratio (required for Tera-Wasserburg format)
-                    Select Case Check207206
-                        Case True
-                            Range(Cells(ODStartRowA, Ratio207206Col), Cells(ODLastRowA, Ratio207206Col)).Copy Destination:=Sheets("Geochronology Data").Cells(1, GDNextCol)
-                            RCIndexRatio207206 = GDNextCol
-                            GDNextCol = GDNextCol + 1
-                            Sheets("Geochronology Data").Cells(1, GDNextCol).Value = "Uncertainty[07/06] " & StandardErrorLevel & "SE"
-                            Range(Cells(ODStartRowB, Ratio207206Col), Cells(ODLastRowB, Ratio207206Col)).Copy Destination:=Sheets("Geochronology Data").Cells(2, GDNextCol)
-                            GDNextCol = GDNextCol + 1
-                        Case False
-                            GoTo MissingRequiredRatio
-                    End Select
-            'Copy/calculate error correlation (rho), write header, approximations based on the mathematics of Schmitz et al 2007
-                    Sheets("Geochronology Data").Cells(1, GDNextCol).Value = "Rho[38/06][07/06]"
+                Case "TeraWasserburg"
+                    Sheets("Geochronology Data").Cells(1, GDNextCol).Value = "Rho_U238Pb206_Pb207Pb206"
                     Select Case RhoCalc
                         Case False
                             If IsNumeric(Rho207Pb206Pbvs238U206PbCol) Then
@@ -856,34 +816,51 @@ Start:
                                 GDNextCol = GDNextCol + 1
                             Else
                                 Select Case Check207235
-                                    Case True
-                                        Sheets("Geochronology Data").Activate
-                                        '[38/06][07/06] (requires 207/235)
-                                        Range(Cells(2, GDNextCol), Cells(GDLastRow, GDNextCol)).FormulaR1C1 = "=(((RC[-3]/RC[-4])^2)+((RC[-1]/RC[-2])^2)-((RC[-7]/RC[-8])^2))/(2*(RC[-3]/RC[-4])*(RC[-1]/RC[-2]))"
-                                        GDNextCol = GDNextCol + 1
-                                        Sheets("Original Data").Activate
-                                    Case False
-                                        GDNextCol = GDNextCol + 1
+                                Case True
+                                    Sheets("Geochronology Data").Activate
+                                    '[38/06][07/06] (requires 207/235)
+                                    Range(Cells(2, GDNextCol), Cells(GDLastRow, GDNextCol)).FormulaR1C1 = "=(((RC[-3]/RC[-4])^2)+((RC[-1]/RC[-2])^2)-((RC[-7]/RC[-8])^2))/(2*(RC[-3]/RC[-4])*(RC[-1]/RC[-2]))"
+                                    GDNextCol = GDNextCol + 1
+                                    Sheets("Original Data").Activate
+                                Case False
+                                    GDNextCol = GDNextCol + 1
                                 End Select
                             End If
                     End Select
-            'Copy age uncertainty estimates and uncertainties, label uncertainty columns
-                '208/232 age estimate
-                    Select Case Check208232
+                End Select
+            'Copy age estimates and uncertainties, label uncertainty columns
+                Select Case ConcordiaPlotType
+                    Case "Wetherill"
+                    '238/206 age estimate
+                        Select Case Check238206
                         Case True
-                            Range(Cells(ODStartRowA, AgeEstimate208232Col), Cells(ODLastRowA, AgeEstimate208232Col)).Copy Destination:=Sheets("Geochronology Data").Cells(1, GDNextCol)
+                            Range(Cells(ODStartRowA, AgeEstimate238206Col), Cells(ODLastRowA, AgeEstimate238206Col)).Copy Destination:=Sheets("Geochronology Data").Cells(1, GDNextCol)
+                            Sheets("Geochronology Data").Cells(1, GDNextCol).Value = "U238Pb206_Ma"
                             GDNextCol = GDNextCol + 1
-                            Sheets("Geochronology Data").Cells(1, GDNextCol).Value = "Uncertainty[08/32] " & StandardErrorLevel & "SE"
-                            Range(Cells(ODStartRowB, AgeEstimate208232Col), Cells(ODLastRowB, AgeEstimate208232Col)).Copy Destination:=Sheets("Geochronology Data").Cells(2, GDNextCol)
+                            Sheets("Geochronology Data").Cells(1, GDNextCol).Value = "U238Pb206_Ma_" & StandardErrorLevel & "SE"
+                            Range(Cells(ODStartRowB, AgeEstimate238206Col), Cells(ODLastRowB, AgeEstimate238206Col)).Copy Destination:=Sheets("Geochronology Data").Cells(2, GDNextCol)
                             GDNextCol = GDNextCol + 1
                         Case False
+                        End Select
+                End Select
+                '208/232 age estimate
+                    Select Case Check208232
+                    Case True
+                        Range(Cells(ODStartRowA, AgeEstimate208232Col), Cells(ODLastRowA, AgeEstimate208232Col)).Copy Destination:=Sheets("Geochronology Data").Cells(1, GDNextCol)
+                        Sheets("Geochronology Data").Cells(1, GDNextCol).Value = "Pb208Th232_Ma"
+                        GDNextCol = GDNextCol + 1
+                        Sheets("Geochronology Data").Cells(1, GDNextCol).Value = "Pb208Th232_Ma_" & StandardErrorLevel & "SE"
+                        Range(Cells(ODStartRowB, AgeEstimate208232Col), Cells(ODLastRowB, AgeEstimate208232Col)).Copy Destination:=Sheets("Geochronology Data").Cells(2, GDNextCol)
+                        GDNextCol = GDNextCol + 1
+                    Case False
                     End Select
                 '207/235 (calc) age estimate
                     Select Case Check207235calc
                     Case True
                         Range(Cells(ODStartRowA, AgeEstimate207235calcCol), Cells(ODLastRowA, AgeEstimate207235calcCol)).Copy Destination:=Sheets("Geochronology Data").Cells(1, GDNextCol)
+                        Sheets("Geochronology Data").Cells(1, GDNextCol).Value = "Pb207U235_calc_Ma"
                         GDNextCol = GDNextCol + 1
-                        Sheets("Geochronology Data").Cells(1, GDNextCol).Value = "Uncertainty[07/35](calc) " & StandardErrorLevel & "SE"
+                        Sheets("Geochronology Data").Cells(1, GDNextCol).Value = "Pb207U235_calc_Ma_" & StandardErrorLevel & "SE"
                         Range(Cells(ODStartRowB, AgeEstimate207235calcCol), Cells(ODLastRowB, AgeEstimate207235calcCol)).Copy Destination:=Sheets("Geochronology Data").Cells(2, GDNextCol)
                         GDNextCol = GDNextCol + 1
                     Case False
@@ -892,68 +869,103 @@ Start:
                     Select Case Check207235
                     Case True
                         Range(Cells(ODStartRowA, AgeEstimate207235Col), Cells(ODLastRowA, AgeEstimate207235Col)).Copy Destination:=Sheets("Geochronology Data").Cells(1, GDNextCol)
+                        Sheets("Geochronology Data").Cells(1, GDNextCol).Value = "Pb207U235_Ma"
                         GDNextCol = GDNextCol + 1
-                        Sheets("Geochronology Data").Cells(1, GDNextCol).Value = "Uncertainty[07/35] " & StandardErrorLevel & "SE"
+                        Sheets("Geochronology Data").Cells(1, GDNextCol).Value = "Pb207U35_Ma_" & StandardErrorLevel & "SE"
                         Range(Cells(ODStartRowB, AgeEstimate207235Col), Cells(ODLastRowB, AgeEstimate207235Col)).Copy Destination:=Sheets("Geochronology Data").Cells(2, GDNextCol)
                         GDNextCol = GDNextCol + 1
                     Case False
                     End Select
                 '206/238 age estimate
                     Select Case Check206238
-                        Case True
-                            Range(Cells(ODStartRowA, AgeEstimate206238Col), Cells(ODLastRowA, AgeEstimate206238Col)).Copy Destination:=Sheets("Geochronology Data").Cells(1, GDNextCol)
-                            RCIndexAge206238 = GDNextCol
-                            GDNextCol = GDNextCol + 1
-                            Sheets("Geochronology Data").Cells(1, GDNextCol).Value = "Uncertainty[06/38] " & StandardErrorLevel & "SE"
-                            Range(Cells(ODStartRowB, AgeEstimate206238Col), Cells(ODLastRowB, AgeEstimate206238Col)).Copy Destination:=Sheets("Geochronology Data").Cells(2, GDNextCol)
-                            GDNextCol = GDNextCol + 1
-                        Case False
+                    Case True
+                        Range(Cells(ODStartRowA, AgeEstimate206238Col), Cells(ODLastRowA, AgeEstimate206238Col)).Copy Destination:=Sheets("Geochronology Data").Cells(1, GDNextCol)
+                        Sheets("Geochronology Data").Cells(1, GDNextCol).Value = "Pb206U238_Ma"
+                        RCIndexAge206238 = GDNextCol
+                        GDNextCol = GDNextCol + 1
+                        Sheets("Geochronology Data").Cells(1, GDNextCol).Value = "Pb206U238_Ma_" & StandardErrorLevel & "SE"
+                        Range(Cells(ODStartRowB, AgeEstimate206238Col), Cells(ODLastRowB, AgeEstimate206238Col)).Copy Destination:=Sheets("Geochronology Data").Cells(2, GDNextCol)
+                        GDNextCol = GDNextCol + 1
+                    Case False
                     End Select
+            Select Case ConcordiaPlotType
+                Case "TeraWasserburg"
                 '238/206 age estimate
                     Select Case Check238206
                         Case True
                             Range(Cells(ODStartRowA, AgeEstimate238206Col), Cells(ODLastRowA, AgeEstimate238206Col)).Copy Destination:=Sheets("Geochronology Data").Cells(1, GDNextCol)
-                            Select Case Check206238
-                                Case False
-                                    RCIndexAge206238 = GDNextCol
-                                Case True
-                            End Select
+                            Sheets("Geochronology Data").Cells(1, GDNextCol).Value = "U238Pb206_Ma"
                             GDNextCol = GDNextCol + 1
-                            Sheets("Geochronology Data").Cells(1, GDNextCol).Value = "Uncertainty[38/06] " & StandardErrorLevel & "SE"
+                            If Check206238 = False Then
+                                RCIndexAge206238 = GDNextCol
+                            End If
+                            Sheets("Geochronology Data").Cells(1, GDNextCol).Value = "U238Pb206_Ma_" & StandardErrorLevel & "SE"
                             Range(Cells(ODStartRowB, AgeEstimate238206Col), Cells(ODLastRowB, AgeEstimate238206Col)).Copy Destination:=Sheets("Geochronology Data").Cells(2, GDNextCol)
                             GDNextCol = GDNextCol + 1
                         Case False
-                            GoTo MissingRequiredAgeEstimate
                     End Select
-                '207/206 age estimate
-                    Select Case Check207206
-                        Case True
-                            Range(Cells(ODStartRowA, AgeEstimate207206Col), Cells(ODLastRowA, AgeEstimate207206Col)).Copy Destination:=Sheets("Geochronology Data").Cells(1, GDNextCol)
-                            RCIndexAge207206 = GDNextCol
-                            GDNextCol = GDNextCol + 1
-                            Sheets("Geochronology Data").Cells(1, GDNextCol).Value = "Uncertainty[07/06] " & StandardErrorLevel & "SE"
-                            Range(Cells(ODStartRowB, AgeEstimate207206Col), Cells(ODLastRowB, AgeEstimate207206Col)).Copy Destination:=Sheets("Geochronology Data").Cells(2, GDNextCol)
-                            GDNextCol = GDNextCol + 1
-                        Case False
-                            GoTo MissingRequiredAgeEstimate
-                    End Select
+            End Select
+            '207/206 age estimate
+                Select Case Check207206
+                    Case True
+                        Range(Cells(ODStartRowA, AgeEstimate207206Col), Cells(ODLastRowA, AgeEstimate207206Col)).Copy Destination:=Sheets("Geochronology Data").Cells(1, GDNextCol)
+                        Sheets("Geochronology Data").Cells(1, GDNextCol).Value = "Pb207Pb206_Ma"
+                        RCIndexAge207206 = GDNextCol
+                        GDNextCol = GDNextCol + 1
+                        Sheets("Geochronology Data").Cells(1, GDNextCol).Value = "Pb207Pb206_Ma_" & StandardErrorLevel & "SE"
+                        Range(Cells(ODStartRowB, AgeEstimate207206Col), Cells(ODLastRowB, AgeEstimate207206Col)).Copy Destination:=Sheets("Geochronology Data").Cells(2, GDNextCol)
+                        GDNextCol = GDNextCol + 1
+                    Case False
+                End Select
             'Concordance calculations
-                Sheets("Geochronology Data").Activate
-                    With ActiveSheet
-                    '[38/06][07/06]
-                        Cells(1, GDNextCol).Value = "Concordance [38/06][07/06]"
-                        Range(Cells(2, GDNextCol), Cells(GDLastRow, GDNextCol)).FormulaR1C1 = "=ROUND((RC[-4]/RC[-2])*100,0)"
-                        GDNextCol = GDNextCol + 1
-                    'Logratio Distance (Aitchison Distance)
-                        Cells(1, GDNextCol).Value = "Concordance [logratio distance]"
-                        RCIndexRatio207206 = RCIndexRatio207206 - GDNextCol
-                        RCIndexRatio238206 = RCIndexRatio238206 - GDNextCol
-                        RCIndexAge206238 = RCIndexAge206238 - GDNextCol
-                        RCIndexAge207206 = RCIndexAge207206 - GDNextCol
-                        Range(Cells(2, GDNextCol), Cells(GDLastRow, GDNextCol)).FormulaR1C1 = "=100*(LN(RC[" & RCIndexRatio238206 & "])-LN(EXP(0.000155125*RC[" & RCIndexAge207206 & "])-1))*SIN(ATAN((LN(RC[" & RCIndexRatio207206 & "])-LN((1/137.818)*(EXP(0.00098485*RC[" & RCIndexAge206238 & "])-1)/(EXP(0.000155125*RC[" & RCIndexAge206238 & "])-1)))/(LN(RC[" & RCIndexRatio238206 & "])-LN(EXP(0.000155125*RC[" & RCIndexAge207206 & "])-1))))"
-                        GDNextCol = GDNextCol + 1
-                    End With
-    End Select
+                Select Case ConcordiaPlotType
+                    Case "Wetherill"
+                        Sheets("Geochronology Data").Activate
+                        With ActiveSheet
+                        '[06/38][07/06]
+                            Cells(1, GDNextCol).Value = "Concordance_Pb206U238_Pb207Pb206"
+                            Range(Cells(2, GDNextCol), Cells(GDLastRow, GDNextCol)).FormulaR1C1 = "=ROUND((RC[-4]/RC[-2])*100,0)"
+                            GDNextCol = GDNextCol + 1
+                        '[06/38][07/35]
+                            Cells(1, GDNextCol).Value = "Concordance_Pb206U238_Pb207U35"
+                            Range(Cells(2, GDNextCol), Cells(GDLastRow, GDNextCol)).FormulaR1C1 = "=ROUND((RC[-5]/RC[-7])*100,0)"
+                            GDNextCol = GDNextCol + 1
+                        '[07/35][07/06]
+                            Cells(1, GDNextCol).Value = "Concordance_Pb207U35_Pb207Pb206]"
+                            Range(Cells(2, GDNextCol), Cells(GDLastRow, GDNextCol)).FormulaR1C1 = "=ROUND((RC[-8]/RC[-4])*100,0)"
+                            GDNextCol = GDNextCol + 1
+                        'Logratio Distance (Aitchison Distance)
+                            Cells(1, GDNextCol).Value = "Concordance_logratio_distance_TW"
+                            RCIndexRatio207206 = RCIndexRatio207206 - GDNextCol
+                            RCIndexRatio238206 = RCIndexRatio238206 - GDNextCol
+                            RCIndexAge206238 = RCIndexAge206238 - GDNextCol
+                            RCIndexAge207206 = RCIndexAge207206 - GDNextCol
+                            Select Case Check238206
+                            Case True
+                                Range(Cells(2, GDNextCol), Cells(GDLastRow, GDNextCol)).FormulaR1C1 = "=100*(LN(RC[" & RCIndexRatio238206 & "])-LN(EXP(0.000155125*RC[" & RCIndexAge207206 & "])-1))*SIN(ATAN((LN(RC[" & RCIndexRatio207206 & "])-LN((1/137.818)*(EXP(0.00098485*RC[" & RCIndexAge206238 & "])-1)/(EXP(0.000155125*RC[" & RCIndexAge206238 & "])-1)))/(LN(RC[" & RCIndexRatio238206 & "])-LN(EXP(0.000155125*RC[" & RCIndexAge207206 & "])-1))))"
+                                GDNextCol = GDNextCol + 1
+                            Case False
+                                Range(Cells(2, GDNextCol), Cells(GDLastRow, GDNextCol)).FormulaR1C1 = "=100*(LN(1/RC[" & RCIndexRatio238206 & "])-LN(EXP(0.000155125*RC[" & RCIndexAge207206 & "])-1))*SIN(ATAN((LN(RC[" & RCIndexRatio207206 & "])-LN((1/137.818)*(EXP(0.00098485*RC[" & RCIndexAge206238 & "])-1)/(EXP(0.000155125*RC[" & RCIndexAge206238 & "])-1)))/(LN(1/RC[" & RCIndexRatio238206 & "])-LN(EXP(0.000155125*RC[" & RCIndexAge207206 & "])-1))))"
+                                GDNextCol = GDNextCol + 1
+                            End Select
+                        End With
+                    Case "TeraWasserburg"
+                        Sheets("Geochronology Data").Activate
+                        With ActiveSheet
+                        '[38/06][07/06]
+                            Cells(1, GDNextCol).Value = "Concordance_U238Pb206_Pb207Pb206"
+                            Range(Cells(2, GDNextCol), Cells(GDLastRow, GDNextCol)).FormulaR1C1 = "=ROUND((RC[-4]/RC[-2])*100,0)"
+                            GDNextCol = GDNextCol + 1
+                        'Logratio Distance (Aitchison Distance)
+                            Cells(1, GDNextCol).Value = "Concordance_logratio_distance_TW"
+                            RCIndexRatio207206 = RCIndexRatio207206 - GDNextCol
+                            RCIndexRatio238206 = RCIndexRatio238206 - GDNextCol
+                            RCIndexAge206238 = RCIndexAge206238 - GDNextCol
+                            RCIndexAge207206 = RCIndexAge207206 - GDNextCol
+                            Range(Cells(2, GDNextCol), Cells(GDLastRow, GDNextCol)).FormulaR1C1 = "=100*(LN(RC[" & RCIndexRatio238206 & "])-LN(EXP(0.000155125*RC[" & RCIndexAge207206 & "])-1))*SIN(ATAN((LN(RC[" & RCIndexRatio207206 & "])-LN((1/137.818)*(EXP(0.00098485*RC[" & RCIndexAge206238 & "])-1)/(EXP(0.000155125*RC[" & RCIndexAge206238 & "])-1)))/(LN(RC[" & RCIndexRatio238206 & "])-LN(EXP(0.000155125*RC[" & RCIndexAge207206 & "])-1))))"
+                            GDNextCol = GDNextCol + 1
+                        End With
+                End Select
     Sheets("Original Data").Activate 'copying comments, source filename, elemental uncertainties
         'Copy Comments
             Range(Cells(ODStartRowA, CommentsCol), Cells(ODLastRowA, CommentsCol)).Copy Destination:=Sheets("Geochronology Data").Cells(1, GDNextCol)
@@ -970,15 +982,45 @@ Start:
     Sheets("Geochronology Data").Activate 'Correct sample label and trailing number for correct sorting in Excel
             GDLastCol = Sheets("Geochronology Data").Cells(1, Columns.Count).End(xlToLeft).Column
             GDLastRow = Sheets("Geochronology Data").Cells(Rows.Count, 1).End(xlUp).Row
+            If Left(Cells(2, SFColDel).Value, 2) = "1-" Or Left(Cells(2, SFColDel).Value, 2) = "1 -" Then
+                NumberingFormat = "NewWave"
+                Else
+                NumberingFormat = "GeoStar"
+            End If
+            Select Case NumberingFormat
+                Case "GeoStar"
             For n = 2 To GDLastRow
                 SourceFile = Cells(n, SFColDel).Value
                 SourceFile = Left(SourceFile, InStrRev(SourceFile, ".") - 1)
-                Sample = Left(SourceFile, InStrRev(SourceFile, "-") - 2)
+                If Mid(SourceFile, InStrRev(SourceFile, "-") - 1, 3) = " - " Then
+                    Sample = Left(SourceFile, InStrRev(SourceFile, "-") - 2)
+                Else
+                    Sample = Left(SourceFile, InStrRev(SourceFile, "-") - 1)
+                End If
                 Range("B" & n).Value = Sample
                 Analysis = Right(SourceFile, Len(SourceFile) - Len(Sample) - 2)
                 Analysis = Format(Analysis, "000")
-                Range("C" & n).Value = Sample & " - " & Analysis
+                Range("C" & n).Value = Sample & "-" & Analysis
             Next n
+                Case "NewWave"
+                    For n = 2 To GDLastRow
+                        SourceFile = Cells(n, SFColDel).Value
+                        SourceFile = Left(SourceFile, InStrRev(SourceFile, ".") - 1)
+                        If Mid(SourceFile, InStr(1, SourceFile, "-") - 1, 3) = " - " Then
+                            Sample = Right(SourceFile, Len(SourceFile) - (InStr(1, SourceFile, "-") + 1))
+                        Else
+                            Sample = Right(SourceFile, Len(SourceFile) - InStr(1, SourceFile, "-"))
+                        End If
+                        Range("B" & n).Value = Sample
+                        If Mid(SourceFile, InStr(1, SourceFile, "-") - 1, 3) = " - " Then
+                            Analysis = Left(SourceFile, InStr(1, SourceFile, "-") - 2)
+                        Else
+                            Analysis = Left(SourceFile, InStr(1, SourceFile, "-") - 1)
+                        End If
+                        Analysis = Format(Analysis, "000")
+                        Range("C" & n).Value = Analysis & "-" & Sample
+                    Next n
+            End Select
         'Copy corrected sample and analysis labels to elemental data
             Select Case TraceElementDataPresent
                 Case True
@@ -993,7 +1035,7 @@ Start:
         'Sort geochronology data
             Set GDRange = Sheets("Geochronology Data").Range("A1", Cells(GDLastRow, GDLastCol))
             With GDRange
-                .Sort Key1:=Range("C1"), order1:=xlAscending, Header:=xlYes
+                .Sort Key1:=Range("B1"), order1:=xlAscending, Header:=xlYes
             End With
         'Set ED Last Column and sort elemental data
             Select Case TraceElementDataPresent
@@ -1003,7 +1045,7 @@ Start:
                     EDLastRow = Sheets("Elemental Data").Cells(Rows.Count, 1).End(xlUp).Row
                     Set EDRange = Sheets("Elemental Data").Range("A1", Cells(EDLastRow, EDLastCol))
                     With EDRange
-                        .Sort Key1:=Range("C1"), order1:=xlAscending, Header:=xlYes
+                        .Sort Key1:=Range("B1"), order1:=xlAscending, Header:=xlYes
                     End With
                 Case False
             End Select
@@ -1145,8 +1187,8 @@ Start:
                             With EDSRange
                                 .Sort Key1:=Range("C1"), order1:=xlAscending, Header:=xlYes
                             End With
-                    'Rename unknowns sheet
-                        Sheets("Elemental Data").Name = "Elemental Data - Unknowns"
+                'Rename unknowns sheet
+                Sheets("Elemental Data").Name = "Elemental Data - Unknowns"
                 Case False
             End Select
     'Format and reset performance optimisations

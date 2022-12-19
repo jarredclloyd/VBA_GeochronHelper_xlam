@@ -1,7 +1,7 @@
 Attribute VB_Name = "LADRprocessorLuHf"
 'Module for handling LADR Lu-Hf geochronology data outputs
 'Created By Jarred Lloyd on 2022-06-14
-'Last modified on 2022-06-25
+'Last modified on 2022-12-19
 'Feel free to modify but give credit and do not sell any version of this, modified or not. It is to remain free for those who need it
 
 Option Explicit
@@ -30,11 +30,13 @@ Option Compare Text
         Dim ODStartRowA As Long
         Dim ODLastRowB As Long
         Dim ODStartRowB As Long
+        Dim ODLastRowC As Long
+        Dim ODStartRowC As Long
         Dim ODLastCol As Long
         Dim GDNextCol As Long
         Dim EDNextCol As Long
     'Variables for headers in original data
-        Dim FMrow As String
+        Dim FirstMassRow As String
         Dim FirstMass As String
         Dim LastMass As String
         Dim SourceFileCol As Long
@@ -42,6 +44,7 @@ Option Compare Text
         Dim AnalysisCol As Long
         Dim ALNumCol As Long
         Dim CommentsCol As Long
+        Dim ElementTotalCol As Long
         Dim EleStartCol As Variant
         Dim EleEndCol As Long
         Dim TraceElementDataPresent As Boolean
@@ -49,12 +52,17 @@ Option Compare Text
         Dim Ratio176Hf177HfCol As Variant
         Dim Ratio176Lu176HfCol As Variant
         Dim Ratio177Hf176HfCol As Variant
+        Dim CPScol1 As Variant
+        Dim CPScol2 As Variant
+        Dim CPScol3 As Variant
+        Dim CommonIsotope As String
         Dim HeaderRange As Range
         Dim HeaderRangeEle As Range
         Dim CommentsColEle As Long
         Dim EleUnStartCol As Long
         Dim EleUnEndCol As Long
     'Variables for ratio pair checking
+        Dim ElementSymNumOrder As Variant
         Dim CheckRatio176Lu177Hf As Boolean
         Dim CheckRatio176Hf177Hf As Boolean
         Dim CheckRatio176Lu176Hf As Boolean
@@ -201,10 +209,10 @@ Start:
         End If
     'Find filtered results section and define variables
         With Sheets("Original Data")
-            FMrow = Range("A:A").Find(what:="Mass", MatchCase:=True, lookat:=xlWhole).Row
-            FMrow = FMrow + 1
-            FirstMass = Range("A" & FMrow).Value
-            LastMass = Range("B" & FMrow).End(xlDown).Offset(0, -1).Value
+            FirstMassRow = Range("A:A").Find(what:="Mass", MatchCase:=True, lookat:=xlWhole).Row
+            FirstMassRow = FirstMassRow + 1
+            FirstMass = Range("A" & FirstMassRow).Value
+            LastMass = Range("B" & FirstMassRow).End(xlDown).Offset(0, -1).Value
             ODStartRowA = Range("A:A").Find(what:="FilteredConcentration_PPM", MatchCase:=True, lookat:=xlPart).Row
             ODStartRowA = ODStartRowA + 2
             ODLastRowA = Range("C" & ODStartRowA).End(xlDown).Row
@@ -217,6 +225,18 @@ Start:
             ODStartRowB = ODStartRowB + 3
             ODLastRowB = Range("C" & ODStartRowB).End(xlDown).Row
         End With
+    'Find GSubCPS and set variables
+        With Sheets("Original Data")
+            ODStartRowC = Range("A:A").Find(what:="GBSub_CPS", MatchCase:=True, lookat:=xlPart).Row
+            ODStartRowC = ODStartRowC + 3
+            ODLastRowC = Range("C" & ODStartRowC).End(xlDown).Row
+        End With
+    'Define element symbol and number order
+            If Cells(FirstMassRow, 1).Value Like "#*" Then
+                ElementSymNumOrder = "NumSym"
+            ElseIf Cells(FirstMassRow, 1).Value Like "[A-Z]*" Then
+                ElementSymNumOrder = "SymNum"
+            End If
     'Define column variables
         With Sheets("Original Data")
             ALNumCol = HeaderRange.Find(what:="AL#", MatchCase:=False).Column
@@ -227,68 +247,146 @@ Start:
             'Check and define presence of trace element data
                 Set EleStartCol = HeaderRange.Find(what:=FirstMass, MatchCase:=False)
                 If Not EleStartCol Is Nothing Then
+                    ElementTotalCol = HeaderRange.Find(what:="Element Total", MatchCase:=False).Column
                     EleStartCol = HeaderRange.Find(what:=FirstMass, MatchCase:=False).Column
                     EleEndCol = HeaderRange.Find(what:=LastMass, MatchCase:=False).Column
                     TraceElementDataPresent = True
                 Else
                     TraceElementDataPresent = False
                 End If
-            'Check and define Lu176/Hf177 ratio
-                Set Ratio176Lu177HfCol = HeaderRange.Find(what:="175Lu/178Hf->260", MatchCase:=False)
-                If Not Ratio176Lu177HfCol Is Nothing Then
-                    Ratio176Lu177HfCol = HeaderRange.Find(what:="175Lu/178Hf->260", MatchCase:=False).Column
-                    CheckRatio176Lu177Hf = True
-                Else
-                    Set Ratio176Lu177HfCol = HeaderRange.Find(what:="175Lu/178Hf", MatchCase:=False)
+        
+        Select Case ElementSymNumOrder
+            Case "NumSym"
+                'CPS Columns
+                    Select Case TraceElementDataPresent
+                        Case True
+                            CPScol1 = HeaderRange.Find(what:="175Lu", MatchCase:=False, lookat:=xlPart).Column
+                            CPScol2 = HeaderRange.Find(what:="176Hf", MatchCase:=False, lookat:=xlPart).Column
+                            CPScol3 = HeaderRange.Find(what:="178Hf", MatchCase:=False, lookat:=xlPart).Column
+                        Case False
+                    End Select
+                'Check and define Lu176/Hf177 ratio
+                    Set Ratio176Lu177HfCol = HeaderRange.Find(what:="175Lu/178Hf->260", MatchCase:=False)
                     If Not Ratio176Lu177HfCol Is Nothing Then
-                        Ratio176Lu177HfCol = HeaderRange.Find(what:="175Lu/178Hf", MatchCase:=False).Column
+                        Ratio176Lu177HfCol = HeaderRange.Find(what:="175Lu/178Hf->260", MatchCase:=False).Column
                         CheckRatio176Lu177Hf = True
                     Else
-                        CheckRatio176Lu177Hf = False
+                        Set Ratio176Lu177HfCol = HeaderRange.Find(what:="175Lu/178Hf", MatchCase:=False)
+                        If Not Ratio176Lu177HfCol Is Nothing Then
+                            Ratio176Lu177HfCol = HeaderRange.Find(what:="175Lu/178Hf", MatchCase:=False).Column
+                            CheckRatio176Lu177Hf = True
+                        Else
+                            CheckRatio176Lu177Hf = False
+                        End If
                     End If
-                End If
-            'Check and define Hf176/Hf177 ratio
-                Set Ratio176Hf177HfCol = HeaderRange.Find(what:="176Hf->258/178Hf->260", MatchCase:=False)
-                If Not Ratio176Hf177HfCol Is Nothing Then
-                    Ratio176Hf177HfCol = HeaderRange.Find(what:="176Hf->258/178Hf->260", MatchCase:=False).Column
-                    CheckRatio176Hf177Hf = True
-                Else
-                    Set Ratio176Hf177HfCol = HeaderRange.Find(what:="176Hf/178Hf", MatchCase:=False)
+                'Check and define Hf176/Hf177 ratio
+                    Set Ratio176Hf177HfCol = HeaderRange.Find(what:="176Hf->258/178Hf->260", MatchCase:=False)
                     If Not Ratio176Hf177HfCol Is Nothing Then
-                        Ratio176Hf177HfCol = HeaderRange.Find(what:="176Hf/178Hf", MatchCase:=False).Column
+                        Ratio176Hf177HfCol = HeaderRange.Find(what:="176Hf->258/178Hf->260", MatchCase:=False).Column
                         CheckRatio176Hf177Hf = True
                     Else
-                        CheckRatio176Hf177Hf = False
+                        Set Ratio176Hf177HfCol = HeaderRange.Find(what:="176Hf/178Hf", MatchCase:=False)
+                        If Not Ratio176Hf177HfCol Is Nothing Then
+                            Ratio176Hf177HfCol = HeaderRange.Find(what:="176Hf/178Hf", MatchCase:=False).Column
+                            CheckRatio176Hf177Hf = True
+                        Else
+                            CheckRatio176Hf177Hf = False
+                        End If
                     End If
-                End If
-            'Check and define Lu176/Hf176 Ratio
-                Set Ratio176Lu176HfCol = HeaderRange.Find(what:="175Lu/176Hf->258", MatchCase:=False)
-                If Not Ratio176Lu176HfCol Is Nothing Then
-                    Ratio176Lu176HfCol = HeaderRange.Find(what:="175Lu/176Hf->258", MatchCase:=False).Column
-                    CheckRatio176Lu176Hf = True
-                Else
-                    Set Ratio176Lu176HfCol = HeaderRange.Find(what:="175Lu/176Hf", MatchCase:=False)
+                'Check and define Lu176/Hf176 Ratio
+                    Set Ratio176Lu176HfCol = HeaderRange.Find(what:="175Lu/176Hf->258", MatchCase:=False)
                     If Not Ratio176Lu176HfCol Is Nothing Then
-                        Ratio176Lu176HfCol = HeaderRange.Find(what:="175Lu/176Hf", MatchCase:=False).Column
+                        Ratio176Lu176HfCol = HeaderRange.Find(what:="175Lu/176Hf->258", MatchCase:=False).Column
                         CheckRatio176Lu176Hf = True
                     Else
-                        CheckRatio176Lu176Hf = False
+                        Set Ratio176Lu176HfCol = HeaderRange.Find(what:="175Lu/176Hf", MatchCase:=False)
+                        If Not Ratio176Lu176HfCol Is Nothing Then
+                            Ratio176Lu176HfCol = HeaderRange.Find(what:="175Lu/176Hf", MatchCase:=False).Column
+                            CheckRatio176Lu176Hf = True
+                        Else
+                            CheckRatio176Lu176Hf = False
+                        End If
                     End If
-                End If
-            'Check and define Hf177/Hf176 ratio
-                Set Ratio177Hf176HfCol = HeaderRange.Find(what:="178Hf->260/176Hf->258", MatchCase:=False)
-                If Not Ratio177Hf176HfCol Is Nothing Then
-                    Ratio177Hf176HfCol = HeaderRange.Find(what:="178Hf->260/176Hf->258", MatchCase:=False).Column
-                    CheckRatio177Hf176Hf = True
-                Else
-                    Set Ratio177Hf176HfCol = HeaderRange.Find(what:="178Hf/176Hf", MatchCase:=False)
+                'Check and define Hf177/Hf176 ratio
+                    Set Ratio177Hf176HfCol = HeaderRange.Find(what:="178Hf->260/176Hf->258", MatchCase:=False)
                     If Not Ratio177Hf176HfCol Is Nothing Then
-                        Ratio177Hf176HfCol = HeaderRange.Find(what:="178Hf/176Hf", MatchCase:=False).Column
+                        Ratio177Hf176HfCol = HeaderRange.Find(what:="178Hf->260/176Hf->258", MatchCase:=False).Column
                         CheckRatio177Hf176Hf = True
                     Else
-                        CheckRatio177Hf176Hf = False
+                        Set Ratio177Hf176HfCol = HeaderRange.Find(what:="178Hf/176Hf", MatchCase:=False)
+                        If Not Ratio177Hf176HfCol Is Nothing Then
+                            Ratio177Hf176HfCol = HeaderRange.Find(what:="178Hf/176Hf", MatchCase:=False).Column
+                            CheckRatio177Hf176Hf = True
+                        Else
+                            CheckRatio177Hf176Hf = False
+                        End If
                     End If
-                End If
+                Case "SymNum"
+                'CPS Columns
+                    Select Case TraceElementDataPresent
+                        Case True
+                            CPScol1 = HeaderRange.Find(what:="Lu175", MatchCase:=False, lookat:=xlPart).Column
+                            CPScol2 = HeaderRange.Find(what:="Hf176", MatchCase:=False, lookat:=xlPart).Column
+                            CPScol3 = HeaderRange.Find(what:="Hf178", MatchCase:=False, lookat:=xlPart).Column
+                        Case False
+                    End Select
+                'Check and define Lu176/Hf177 ratio
+                    Set Ratio176Lu177HfCol = HeaderRange.Find(what:="Lu175/Hf178->260", MatchCase:=False)
+                    If Not Ratio176Lu177HfCol Is Nothing Then
+                        Ratio176Lu177HfCol = HeaderRange.Find(what:="Lu175/Hf178->260", MatchCase:=False).Column
+                        CheckRatio176Lu177Hf = True
+                    Else
+                        Set Ratio176Lu177HfCol = HeaderRange.Find(what:="Lu175/Hf178", MatchCase:=False)
+                        If Not Ratio176Lu177HfCol Is Nothing Then
+                            Ratio176Lu177HfCol = HeaderRange.Find(what:="Lu175/Hf178", MatchCase:=False).Column
+                            CheckRatio176Lu177Hf = True
+                        Else
+                            CheckRatio176Lu177Hf = False
+                        End If
+                    End If
+                'Check and define Hf176/Hf177 ratio
+                    Set Ratio176Hf177HfCol = HeaderRange.Find(what:="Hf176->258/Hf178->260", MatchCase:=False)
+                    If Not Ratio176Hf177HfCol Is Nothing Then
+                        Ratio176Hf177HfCol = HeaderRange.Find(what:="Hf176->258/Hf178->260", MatchCase:=False).Column
+                        CheckRatio176Hf177Hf = True
+                    Else
+                        Set Ratio176Hf177HfCol = HeaderRange.Find(what:="Hf176/Hf178", MatchCase:=False)
+                        If Not Ratio176Hf177HfCol Is Nothing Then
+                            Ratio176Hf177HfCol = HeaderRange.Find(what:="Hf176/Hf178", MatchCase:=False).Column
+                            CheckRatio176Hf177Hf = True
+                        Else
+                            CheckRatio176Hf177Hf = False
+                        End If
+                    End If
+                'Check and define Lu176/Hf176 Ratio
+                    Set Ratio176Lu176HfCol = HeaderRange.Find(what:="Lu175/Hf176->258", MatchCase:=False)
+                    If Not Ratio176Lu176HfCol Is Nothing Then
+                        Ratio176Lu176HfCol = HeaderRange.Find(what:="Lu175/Hf176->258", MatchCase:=False).Column
+                        CheckRatio176Lu176Hf = True
+                    Else
+                        Set Ratio176Lu176HfCol = HeaderRange.Find(what:="Lu175/Hf176", MatchCase:=False)
+                        If Not Ratio176Lu176HfCol Is Nothing Then
+                            Ratio176Lu176HfCol = HeaderRange.Find(what:="Lu175/Hf176", MatchCase:=False).Column
+                            CheckRatio176Lu176Hf = True
+                        Else
+                            CheckRatio176Lu176Hf = False
+                        End If
+                    End If
+                'Check and define Hf177/Hf176 ratio
+                    Set Ratio177Hf176HfCol = HeaderRange.Find(what:="Hf178->260/Hf176->258", MatchCase:=False)
+                    If Not Ratio177Hf176HfCol Is Nothing Then
+                        Ratio177Hf176HfCol = HeaderRange.Find(what:="Hf178->260/Hf176->258", MatchCase:=False).Column
+                        CheckRatio177Hf176Hf = True
+                    Else
+                        Set Ratio177Hf176HfCol = HeaderRange.Find(what:="Hf178/Hf176", MatchCase:=False)
+                        If Not Ratio177Hf176HfCol Is Nothing Then
+                            Ratio177Hf176HfCol = HeaderRange.Find(what:="Hf178/Hf176", MatchCase:=False).Column
+                            CheckRatio177Hf176Hf = True
+                        Else
+                            CheckRatio177Hf176Hf = False
+                        End If
+                    End If
+                End Select
             'Check that at least one ratio pair (normal or inverse isochron) is present
                 If CheckRatio176Lu177Hf = True And CheckRatio176Hf177Hf = True Then
                     RatioPairNormalPresent = True
@@ -326,10 +424,12 @@ Start:
         Sheets("Original Data").Activate
     'Copy AL#, sample name and analysis number
         Range(Cells(ODStartRowA, ALNumCol), Cells(ODLastRowA, ALNumCol)).Copy Destination:=Sheets("Geochronology Data").Range("A1")
+        Sheets("Geochronology Data").Range("A1").Value = "ALnum"
         Range(Cells(ODStartRowA, SampleCol), Cells(ODLastRowA, AnalysisCol)).Copy Destination:=Sheets("Geochronology Data").Range("B1")
         Select Case TraceElementDataPresent
             Case True
                 Range(Cells(ODStartRowA, ALNumCol), Cells(ODLastRowA, ALNumCol)).Copy Destination:=Sheets("Elemental Data").Range("A1")
+                Sheets("Elemental Data").Range("A1").Value = "ALnum"
                 Range(Cells(ODStartRowA, SampleCol), Cells(ODLastRowA, AnalysisCol)).Copy Destination:=Sheets("Elemental Data").Range("B1")
             Case False
         End Select
@@ -338,10 +438,12 @@ Start:
             Case True
                 EDLastCol = Sheets("Elemental Data").Cells(1, Columns.Count).End(xlToLeft).Column
                 EDNextCol = EDLastCol + 1
+                Range(Cells(ODStartRowA, ElementTotalCol), Cells(ODLastRowA, ElementTotalCol)).Copy Destination:=Sheets("Elemental Data").Cells(1, EDNextCol)
+                EDNextCol = EDNextCol + 1
                 For n = EleStartCol To EleEndCol
                     Range(Cells(ODStartRowA, n), Cells(ODLastRowA, n)).Copy Destination:=Sheets("Elemental Data").Cells(1, EDNextCol)
                     EDNextCol = EDNextCol + 1
-                    Sheets("Elemental Data").Cells(1, EDNextCol).Value = Sheets("Elemental Data").Cells(1, EDNextCol - 1).Value & " " & StandardErrorLevel & "SE"
+                    Sheets("Elemental Data").Cells(1, EDNextCol).Value = Sheets("Elemental Data").Cells(1, EDNextCol - 1).Value & "_" & StandardErrorLevel & "SE"
                     Range(Cells(ODStartRowB, n), Cells(ODLastRowB, n)).Copy Destination:=Sheets("Elemental Data").Cells(2, EDNextCol)
                     EDNextCol = EDNextCol + 1
                 Next n
@@ -354,26 +456,43 @@ Start:
             GDLastCol = Sheets("Geochronology Data").Cells(1, Columns.Count).End(xlToLeft).Column
             GDNextCol = GDLastCol + 1
             GDLastRow = Sheets("Geochronology Data").Cells(Rows.Count, 1).End(xlUp).Row
+        'Copy Important CPS columns
+            Select Case TraceElementDataPresent
+            Case True
+                'Lu175
+                    Range(Cells(ODStartRowC, CPScol1), Cells(ODLastRowC, CPScol1)).Copy Destination:=Sheets("Geochronology Data").Cells(2, GDNextCol)
+                    Sheets("Geochronology Data").Cells(1, GDNextCol).Value = "Lu175_CPS"
+                    GDNextCol = GDNextCol + 1
+                'Hf176
+                    Range(Cells(ODStartRowC, CPScol2), Cells(ODLastRowC, CPScol2)).Copy Destination:=Sheets("Geochronology Data").Cells(2, GDNextCol)
+                    Sheets("Geochronology Data").Cells(1, GDNextCol).Value = "Hf176_CPS"
+                    GDNextCol = GDNextCol + 1
+                'Hf178
+                    Range(Cells(ODStartRowC, CPScol3), Cells(ODLastRowC, CPScol3)).Copy Destination:=Sheets("Geochronology Data").Cells(2, GDNextCol)
+                    Sheets("Geochronology Data").Cells(1, GDNextCol).Value = "Hf178_CPS"
+                    GDNextCol = GDNextCol + 1
+                Case False
+            End Select
         'Copy ratios and uncertainties, label uncertainty columns
         'Normal isochron ratios
             Select Case RatioPairNormalPresent
             Case True
                 'Lu176/Hf177
                     Range(Cells(ODStartRowA, Ratio176Lu177HfCol), Cells(ODLastRowA, Ratio176Lu177HfCol)).Copy Destination:=Sheets("Geochronology Data").Cells(1, GDNextCol)
-                    Sheets("Geochronology Data").Cells(1, GDNextCol).Value = "(Uncorr)Lu176/Hf177"
+                    Sheets("Geochronology Data").Cells(1, GDNextCol).Value = "Lu176Hf177"
                     GDNextCol = GDNextCol + 1
-                    Sheets("Geochronology Data").Cells(1, GDNextCol).Value = "Uncertainty[Lu176/Hf177] " & StandardErrorLevel & "SE"
+                    Sheets("Geochronology Data").Cells(1, GDNextCol).Value = "Lu176Hf177_" & StandardErrorLevel & "SE"
                     Range(Cells(ODStartRowB, Ratio176Lu177HfCol), Cells(ODLastRowB, Ratio176Lu177HfCol)).Copy Destination:=Sheets("Geochronology Data").Cells(2, GDNextCol)
                     GDNextCol = GDNextCol + 1
                 'Hf176/Hf177
                     Range(Cells(ODStartRowA, Ratio176Hf177HfCol), Cells(ODLastRowA, Ratio176Hf177HfCol)).Copy Destination:=Sheets("Geochronology Data").Cells(1, GDNextCol)
-                    Sheets("Geochronology Data").Cells(1, GDNextCol).Value = "Hf176/Hf177"
+                    Sheets("Geochronology Data").Cells(1, GDNextCol).Value = "Hf176Hf177"
                     GDNextCol = GDNextCol + 1
-                    Sheets("Geochronology Data").Cells(1, GDNextCol).Value = "Uncertainty[Hf176/Hf177] " & StandardErrorLevel & "SE"
+                    Sheets("Geochronology Data").Cells(1, GDNextCol).Value = "Hf176Hf177_" & StandardErrorLevel & "SE"
                     Range(Cells(ODStartRowB, Ratio176Hf177HfCol), Cells(ODLastRowB, Ratio176Hf177HfCol)).Copy Destination:=Sheets("Geochronology Data").Cells(2, GDNextCol)
                     GDNextCol = GDNextCol + 1
             'Copy/calculate error correlation (rho)
-                Sheets("Geochronology Data").Cells(1, GDNextCol).Value = "Rho[Lu176/Hf177][Hf176/Hf177]"
+                Sheets("Geochronology Data").Cells(1, GDNextCol).Value = "Rho_Lu176Hf177_Hf176Hf177"
                 Select Case RhoCalc
                     Case False
                         If IsNumeric(RhoLuHfCol) Then
@@ -398,20 +517,20 @@ Start:
             Case True
                 'Lu176/Hf176
                     Range(Cells(ODStartRowA, Ratio176Lu176HfCol), Cells(ODLastRowA, Ratio176Lu176HfCol)).Copy Destination:=Sheets("Geochronology Data").Cells(1, GDNextCol)
-                    Sheets("Geochronology Data").Cells(1, GDNextCol).Value = "(Uncorr)Lu176/Hf176"
+                    Sheets("Geochronology Data").Cells(1, GDNextCol).Value = "Lu176Hf176"
                     GDNextCol = GDNextCol + 1
-                    Sheets("Geochronology Data").Cells(1, GDNextCol).Value = "Uncertainty[Lu176/Hf176] " & StandardErrorLevel & "SE"
+                    Sheets("Geochronology Data").Cells(1, GDNextCol).Value = "Lu176Hf176_" & StandardErrorLevel & "SE"
                     Range(Cells(ODStartRowB, Ratio176Lu176HfCol), Cells(ODLastRowB, Ratio176Lu176HfCol)).Copy Destination:=Sheets("Geochronology Data").Cells(2, GDNextCol)
                     GDNextCol = GDNextCol + 1
                 'Hf177/Hf176
                     Range(Cells(ODStartRowA, Ratio177Hf176HfCol), Cells(ODLastRowA, Ratio177Hf176HfCol)).Copy Destination:=Sheets("Geochronology Data").Cells(1, GDNextCol)
-                    Sheets("Geochronology Data").Cells(1, GDNextCol).Value = "Hf177/Hf176"
+                    Sheets("Geochronology Data").Cells(1, GDNextCol).Value = "Hf177Hf176"
                     GDNextCol = GDNextCol + 1
-                    Sheets("Geochronology Data").Cells(1, GDNextCol).Value = "Uncertainty[Hf177/Hf176] " & StandardErrorLevel & "SE"
+                    Sheets("Geochronology Data").Cells(1, GDNextCol).Value = "Hf177Hf176_" & StandardErrorLevel & "SE"
                     Range(Cells(ODStartRowB, Ratio177Hf176HfCol), Cells(ODLastRowB, Ratio177Hf176HfCol)).Copy Destination:=Sheets("Geochronology Data").Cells(2, GDNextCol)
                     GDNextCol = GDNextCol + 1
             'Copy/calculate error correlation (rho)
-                Sheets("Geochronology Data").Cells(1, GDNextCol).Value = "Rho[Lu176/Hf176][Hf177/Hf176]"
+                Sheets("Geochronology Data").Cells(1, GDNextCol).Value = "Rho_Lu176Hf176_Hf177Hf176"
                 Select Case RhoCalc
                     Case False
                         If IsNumeric(RhoLuHfCol) Then
@@ -449,11 +568,15 @@ Start:
             For n = 2 To GDLastRow
                 SourceFile = Cells(n, SFColDel).Value
                 SourceFile = Left(SourceFile, InStrRev(SourceFile, ".") - 1)
-                Sample = Left(SourceFile, InStrRev(SourceFile, "-") - 2)
+                If Mid(SourceFile, InStrRev(SourceFile, "-") - 1, 3) = " - " Then
+                    Sample = Left(SourceFile, InStrRev(SourceFile, "-") - 2)
+                Else
+                    Sample = Left(SourceFile, InStrRev(SourceFile, "-") - 1)
+                End If
                 Range("B" & n).Value = Sample
                 Analysis = Right(SourceFile, Len(SourceFile) - Len(Sample) - 2)
                 Analysis = Format(Analysis, "000")
-                Range("C" & n).Value = Sample & " - " & Analysis
+                Range("C" & n).Value = Sample & "-" & Analysis
             Next n
         'Copy corrected sample and analysis labels to elemental data
            Select Case TraceElementDataPresent
@@ -684,6 +807,13 @@ Start:
                         .Range(Cells(1, ComCol), Cells(LastRow, ComCol)).Columns.AutoFit
                         .Range("A1", Cells(1, LastCol)).Font.Bold = True
                         .Range("A1", Cells(LastRow, LastCol)).Font.Size = 8
+                        Select Case TraceElementDataPresent
+                        Case True
+                            CPScol1 = Range("A1", Cells(1, LastCol)).Find(what:="Lu175_CPS", MatchCase:=True).Column
+                            CPScol2 = Range("A1", Cells(1, LastCol)).Find(what:="Hf178_CPS", MatchCase:=True).Column
+                            .Range(Cells(2, CPScol1), Cells(LastRow, CPScol2)).NumberFormat = "0"
+                        Case False
+                        End Select
                     End With
                     With ActiveWindow
                         .SplitColumn = 3
@@ -702,6 +832,13 @@ Start:
                         .Range(Cells(1, ComCol), Cells(LastRow, ComCol)).Columns.AutoFit
                         .Range("A1", Cells(1, LastCol)).Font.Bold = True
                         .Range("A1", Cells(LastRow, LastCol)).Font.Size = 8
+                        Select Case TraceElementDataPresent
+                        Case True
+                            CPScol1 = Range("A1", Cells(1, LastCol)).Find(what:="Lu175_CPS", MatchCase:=True).Column
+                            CPScol2 = Range("A1", Cells(1, LastCol)).Find(what:="Hf178_CPS", MatchCase:=True).Column
+                            .Range(Cells(2, CPScol1), Cells(LastRow, CPScol2)).NumberFormat = "0"
+                        Case False
+                        End Select
                     End With
                     With ActiveWindow
                         .SplitColumn = 3
@@ -870,10 +1007,10 @@ Start:
         End If
     'Find filtered results section and define variables
         With Sheets("Original Data")
-            FMrow = Range("A:A").Find(what:="Mass", MatchCase:=True, lookat:=xlWhole).Row
-            FMrow = FMrow + 1
-            FirstMass = Range("A" & FMrow).Value
-            LastMass = Range("B" & FMrow).End(xlDown).Offset(0, -1).Value
+            FirstMassRow = Range("A:A").Find(what:="Mass", MatchCase:=True, lookat:=xlWhole).Row
+            FirstMassRow = FirstMassRow + 1
+            FirstMass = Range("A" & FirstMassRow).Value
+            LastMass = Range("B" & FirstMassRow).End(xlDown).Offset(0, -1).Value
             ODStartRowA = Range("A:A").Find(what:="FilteredConcentration_PPM", MatchCase:=True, lookat:=xlPart).Row
             ODStartRowA = ODStartRowA + 2
             ODLastRowA = Range("C" & ODStartRowA).End(xlDown).Row
@@ -893,6 +1030,14 @@ Start:
             SampleCol = HeaderRange.Find(what:="Sample", MatchCase:=False).Column
             AnalysisCol = HeaderRange.Find(what:="Analysis", MatchCase:=False).Column
             CommentsCol = HeaderRange.Find(what:="Comment", MatchCase:=False).Column
+    'Check Element number and symbol order
+        If Cells(FirstMassRow, 1).Value Like "#*" Then
+            ElementSymNumOrder = "NumSym"
+        ElseIf Cells(FirstMassRow, 1).Value Like "[A-Z]*" Then
+            ElementSymNumOrder = "SymNum"
+        End If
+        Select Case ElementSymNumOrder
+            Case "NumSym"
             'Check and define 238U/206Pb ratio (238U/206Pb as proxy for Lu176/Hf177 or Lu176/Hf176 to determine error correlation in LADR)
                 Set Ratio176Lu177HfCol = HeaderRange.Find(what:="238U/206Pb", MatchCase:=False)
                 If Not Ratio176Lu177HfCol Is Nothing Then
@@ -920,6 +1065,35 @@ Start:
                     Exit Sub
                 Else
                 End If
+            Case "SymNum"
+            'Check and define 238U/206Pb ratio (238U/206Pb as proxy for Lu176/Hf177 or Lu176/Hf176 to determine error correlation in LADR)
+                Set Ratio176Lu177HfCol = HeaderRange.Find(what:="U238/Pb206", MatchCase:=False)
+                If Not Ratio176Lu177HfCol Is Nothing Then
+                    Ratio176Lu177HfCol = HeaderRange.Find(what:="U238/Pb206", MatchCase:=False).Column
+                    CheckRatio176Lu177Hf = True
+                Else
+                    CheckRatio176Lu177Hf = False
+                End If
+            'Check and define 207Pb/206Pb ratio (207Pb/206Pb as proxy for Hf176/Hf177 or Hf177/Hf176 to determine error correlation in LADR)
+                Set Ratio176Hf177HfCol = HeaderRange.Find(what:="Pb207/Pb206", MatchCase:=False)
+                If Not Ratio176Hf177HfCol Is Nothing Then
+                    Ratio176Hf177HfCol = HeaderRange.Find(what:="Pb207/Pb206", MatchCase:=False).Column
+                    CheckRatio176Hf177Hf = True
+                Else
+                    CheckRatio176Hf177Hf = False
+                End If
+            'Check that at least one ratio pair (normal or inverse isochron) is present
+                If CheckRatio176Lu177Hf = True And CheckRatio176Hf177Hf = True Then
+                    RatioPairNormalPresent = True
+                Else
+                    RatioPairNormalPresent = False
+                End If
+                If RatioPairNormalPresent = False Then
+                    MsgBox ("The 238U/206Pb and 207Pb/206Pb ratio pair is required for this procedure to continue." & vbCrLf & vbCrLf & "Please check that both are present." & vbCrLf & vbCrLf & "Procedure ended.")
+                    Exit Sub
+                Else
+                End If
+            End Select
             'Check and define error correlations (U/Pb systems used to force LADR to calculate error correlation, otherwise two system approach is used but is likely to be unstable)
                 Set RhoLuHfCol = HeaderRange.Find(what:="Rho: 207/206 vs 238/206", MatchCase:=False, lookat:=xlPart)
                 If Not RhoLuHfCol Is Nothing Then
@@ -991,11 +1165,15 @@ Start:
             For n = 2 To GDLastRow
                 SourceFile = Cells(n, SFColDel).Value
                 SourceFile = Left(SourceFile, InStrRev(SourceFile, ".") - 1)
-                Sample = Left(SourceFile, InStrRev(SourceFile, "-") - 2)
+                If Mid(SourceFile, InStrRev(SourceFile, "-") - 1, 3) = " - " Then
+                    Sample = Left(SourceFile, InStrRev(SourceFile, "-") - 2)
+                Else
+                    Sample = Left(SourceFile, InStrRev(SourceFile, "-") - 1)
+                End If
                 Range("B" & n).Value = Sample
                 Analysis = Right(SourceFile, Len(SourceFile) - Len(Sample) - 2)
                 Analysis = Format(Analysis, "000")
-                Range("C" & n).Value = Sample & " - " & Analysis
+                Range("C" & n).Value = Sample & "-" & Analysis
             Next n
     'Sort prior to cut - performance optimisation
         'Delete sourcefile column

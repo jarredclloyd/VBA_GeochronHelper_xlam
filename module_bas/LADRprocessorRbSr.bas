@@ -1,7 +1,7 @@
 Attribute VB_Name = "LADRprocessorRbSr"
 'Module for handling LADR Rb-Sr geochronology data outputs
 'Created By Jarred Lloyd on 2020-03-08
-'Last modified on 2022-07-02
+'Last modified on 2022-12-19
 'Feel free to modify but give credit and do not sell any version of this, modified or not. It is to remain free for those who need it
 
 Option Explicit
@@ -30,11 +30,13 @@ Option Compare Text
         Dim ODStartRowA As Long
         Dim ODLastRowB As Long
         Dim ODStartRowB As Long
+        Dim ODLastRowC As Long
+        Dim ODStartRowC As Long
         Dim ODLastCol As Long
         Dim GDNextCol As Long
         Dim EDNextCol As Long
     'Variables for headers in original data
-        Dim FMrow As String
+        Dim FirstMassRow As String
         Dim FirstMass As String
         Dim LastMass As String
         Dim SourceFileCol As Long
@@ -42,6 +44,7 @@ Option Compare Text
         Dim AnalysisCol As Long
         Dim ALNumCol As Long
         Dim CommentsCol As Long
+        Dim ElementTotalCol As Long
         Dim EleStartCol As Variant
         Dim EleEndCol As Long
         Dim TraceElementDataPresent As Boolean
@@ -49,12 +52,17 @@ Option Compare Text
         Dim Ratio87Sr86SrCol As Variant
         Dim Ratio87Rb87SrCol As Variant
         Dim Ratio86Sr87SrCol As Variant
+        Dim CPScol1 As Variant
+        Dim CPScol2 As Variant
+        Dim CPScol3 As Variant
+        Dim CommonIsotope As String
         Dim HeaderRange As Range
         Dim HeaderRangeEle As Range
         Dim CommentsColEle As Long
         Dim EleUnStartCol As Long
         Dim EleUnEndCol As Long
     'Variables for ratio pair checking
+        Dim ElementSymNumOrder As Variant
         Dim CheckRatio87Rb86Sr As Boolean
         Dim CheckRatio87Sr86Sr As Boolean
         Dim CheckRatio87Rb87Sr As Boolean
@@ -200,10 +208,10 @@ Start:
         End If
     'Find filtered results section and define variables
         With Sheets("Original Data")
-            FMrow = Range("A:A").Find(what:="Mass", MatchCase:=True, lookat:=xlWhole).Row
-            FMrow = FMrow + 1
-            FirstMass = Range("A" & FMrow).Value
-            LastMass = Range("B" & FMrow).End(xlDown).Offset(0, -1).Value
+            FirstMassRow = Range("A:A").Find(what:="Mass", MatchCase:=True, lookat:=xlWhole).Row
+            FirstMassRow = FirstMassRow + 1
+            FirstMass = Range("A" & FirstMassRow).Value
+            LastMass = Range("B" & FirstMassRow).End(xlDown).Offset(0, -1).Value
             ODStartRowA = Range("A:A").Find(what:="FilteredConcentration_PPM", MatchCase:=True, lookat:=xlPart).Row
             ODStartRowA = ODStartRowA + 2
             ODLastRowA = Range("C" & ODStartRowA).End(xlDown).Row
@@ -216,6 +224,18 @@ Start:
             ODStartRowB = ODStartRowB + 3
             ODLastRowB = Range("C" & ODStartRowB).End(xlDown).Row
         End With
+    'Find GSubCPS and set variables
+        With Sheets("Original Data")
+            ODStartRowC = Range("A:A").Find(what:="GBSub_CPS", MatchCase:=True, lookat:=xlPart).Row
+            ODStartRowC = ODStartRowC + 3
+            ODLastRowC = Range("C" & ODStartRowC).End(xlDown).Row
+        End With
+    'Define element symbol and number order
+        If Cells(FirstMassRow, 1).Value Like "#*" Then
+            ElementSymNumOrder = "NumSym"
+        ElseIf Cells(FirstMassRow, 1).Value Like "[A-Z]*" Then
+            ElementSymNumOrder = "SymNum"
+        End If
     'Define column variables
         With Sheets("Original Data")
             ALNumCol = HeaderRange.Find(what:="AL#", MatchCase:=False).Column
@@ -226,86 +246,195 @@ Start:
             'Check and define presence of trace element data
                 Set EleStartCol = HeaderRange.Find(what:=FirstMass, MatchCase:=False)
                 If Not EleStartCol Is Nothing Then
+                    ElementTotalCol = HeaderRange.Find(what:="Element Total", MatchCase:=False).Column
                     EleStartCol = HeaderRange.Find(what:=FirstMass, MatchCase:=False).Column
                     EleEndCol = HeaderRange.Find(what:=LastMass, MatchCase:=False).Column
                     TraceElementDataPresent = True
                 Else
                     TraceElementDataPresent = False
                 End If
-            'Check and define 85Rb/86Sr ratio (Rb85 used as proxy to measure Rb87)
-                Set Ratio87Rb86SrCol = HeaderRange.Find(what:="85Rb/86Sr->102", MatchCase:=False)
-                If Not Ratio87Rb86SrCol Is Nothing Then
-                    Ratio87Rb86SrCol = HeaderRange.Find(what:="85Rb/86Sr->102", MatchCase:=False).Column
-                    CheckRatio87Rb86Sr = True
-                Else
-                    Set Ratio87Rb86SrCol = HeaderRange.Find(what:="85Rb/86Sr", MatchCase:=False)
+            Select Case ElementSymNumOrder
+                Case "NumSym"
+                'CPS Columns
+                    Select Case TraceElementDataPresent
+                        Case True
+                            CPScol1 = HeaderRange.Find(what:="85Rb", MatchCase:=False, lookat:=xlPart).Column
+                            Set Ratio87Rb86SrCol = HeaderRange.Find(what:="85Rb/86Sr->102", MatchCase:=False)
+                            If Not Ratio87Rb86SrCol Is Nothing Then
+                                CPScol2 = HeaderRange.Find(what:="86Sr", MatchCase:=False, lookat:=xlPart).Column
+                                CommonIsotope = "Sr86"
+                            Else
+                                CPScol2 = HeaderRange.Find(what:="88Sr", MatchCase:=False, lookat:=xlPart).Column
+                                CommonIsotope = "Sr88"
+                            End If
+                            CPScol3 = HeaderRange.Find(what:="87Sr", MatchCase:=False, lookat:=xlPart).Column
+                        Case False
+                    End Select
+                'Check and define 85Rb/86Sr ratio (Rb85 used as proxy to measure Rb87)
+                    Set Ratio87Rb86SrCol = HeaderRange.Find(what:="85Rb/86Sr->102", MatchCase:=False)
                     If Not Ratio87Rb86SrCol Is Nothing Then
-                        Ratio87Rb86SrCol = HeaderRange.Find(what:="85Rb/86Sr", MatchCase:=False).Column
+                        Ratio87Rb86SrCol = HeaderRange.Find(what:="85Rb/86Sr->102", MatchCase:=False).Column
                         CheckRatio87Rb86Sr = True
                     Else
-                        Set Ratio87Rb86SrCol = HeaderRange.Find(what:="85Rb/88Sr->104", MatchCase:=False)
+                        Set Ratio87Rb86SrCol = HeaderRange.Find(what:="85Rb/86Sr", MatchCase:=False)
                         If Not Ratio87Rb86SrCol Is Nothing Then
-                            Ratio87Rb86SrCol = HeaderRange.Find(what:="85Rb/88Sr->104", MatchCase:=False).Column
+                            Ratio87Rb86SrCol = HeaderRange.Find(what:="85Rb/86Sr", MatchCase:=False).Column
                             CheckRatio87Rb86Sr = True
                         Else
-                            CheckRatio87Rb86Sr = False
+                            Set Ratio87Rb86SrCol = HeaderRange.Find(what:="85Rb/88Sr->104", MatchCase:=False)
+                            If Not Ratio87Rb86SrCol Is Nothing Then
+                                Ratio87Rb86SrCol = HeaderRange.Find(what:="85Rb/88Sr->104", MatchCase:=False).Column
+                                CheckRatio87Rb86Sr = True
+                            Else
+                                CheckRatio87Rb86Sr = False
+                            End If
                         End If
                     End If
-                End If
-            'Check and define 87Rb/86Sr ratio
-                Set Ratio87Sr86SrCol = HeaderRange.Find(what:="87Sr->103/86Sr->102", MatchCase:=False)
-                If Not Ratio87Sr86SrCol Is Nothing Then
-                    Ratio87Sr86SrCol = HeaderRange.Find(what:="87Sr->103/86Sr->102", MatchCase:=False).Column
-                    CheckRatio87Sr86Sr = True
-                Else
-                    Set Ratio87Sr86SrCol = HeaderRange.Find(what:="87Sr/86Sr", MatchCase:=False)
+                'Check and define 87Sr/86Sr ratio
+                    Set Ratio87Sr86SrCol = HeaderRange.Find(what:="87Sr->103/86Sr->102", MatchCase:=False)
                     If Not Ratio87Sr86SrCol Is Nothing Then
-                        Ratio87Sr86SrCol = HeaderRange.Find(what:="87Sr/86Sr", MatchCase:=False).Column
+                        Ratio87Sr86SrCol = HeaderRange.Find(what:="87Sr->103/86Sr->102", MatchCase:=False).Column
                         CheckRatio87Sr86Sr = True
                     Else
-                        Set Ratio87Sr86SrCol = HeaderRange.Find(what:="87Sr->103/88Sr->104", MatchCase:=False)
+                        Set Ratio87Sr86SrCol = HeaderRange.Find(what:="87Sr/86Sr", MatchCase:=False)
                         If Not Ratio87Sr86SrCol Is Nothing Then
-                            Ratio87Sr86SrCol = HeaderRange.Find(what:="87Sr->103/88Sr->104", MatchCase:=False).Column
+                            Ratio87Sr86SrCol = HeaderRange.Find(what:="87Sr/86Sr", MatchCase:=False).Column
                             CheckRatio87Sr86Sr = True
                         Else
-                            CheckRatio87Sr86Sr = False
+                            Set Ratio87Sr86SrCol = HeaderRange.Find(what:="87Sr->103/88Sr->104", MatchCase:=False)
+                            If Not Ratio87Sr86SrCol Is Nothing Then
+                                Ratio87Sr86SrCol = HeaderRange.Find(what:="87Sr->103/88Sr->104", MatchCase:=False).Column
+                                CheckRatio87Sr86Sr = True
+                            Else
+                                CheckRatio87Sr86Sr = False
+                            End If
                         End If
                     End If
-                End If
-            'Check and define 85Rb/87Sr ratio (Rb85 used as proxy to measure Rb87)
-                Set Ratio87Rb87SrCol = HeaderRange.Find(what:="85Rb/87Sr->103", MatchCase:=False)
-                If Not Ratio87Rb87SrCol Is Nothing Then
-                    Ratio87Rb87SrCol = HeaderRange.Find(what:="85Rb/87Sr->103", MatchCase:=False).Column
-                    CheckRatio87Rb87Sr = True
-                Else
-                    Set Ratio87Rb87SrCol = HeaderRange.Find(what:="85Rb/87Sr", MatchCase:=False)
+                'Check and define 85Rb/87Sr ratio (Rb85 used as proxy to measure Rb87)
+                    Set Ratio87Rb87SrCol = HeaderRange.Find(what:="85Rb/87Sr->103", MatchCase:=False)
                     If Not Ratio87Rb87SrCol Is Nothing Then
-                        Ratio87Rb87SrCol = HeaderRange.Find(what:="85Rb/87Sr", MatchCase:=False).Column
+                        Ratio87Rb87SrCol = HeaderRange.Find(what:="85Rb/87Sr->103", MatchCase:=False).Column
                         CheckRatio87Rb87Sr = True
                     Else
-                        CheckRatio87Rb87Sr = False
-                    End If
-                End If
-            'Check and define 86Sr/867r ratio
-                Set Ratio86Sr87SrCol = HeaderRange.Find(what:="86Sr->102/87Sr->103", MatchCase:=False)
-                If Not Ratio86Sr87SrCol Is Nothing Then
-                    Ratio86Sr87SrCol = HeaderRange.Find(what:="86Sr->102/87Sr->103", MatchCase:=False).Column
-                    CheckRatio86Sr87Sr = True
-                Else
-                    Set Ratio86Sr87SrCol = HeaderRange.Find(what:="86Sr/87Sr", MatchCase:=False)
-                    If Not Ratio86Sr87SrCol Is Nothing Then
-                        Ratio86Sr87SrCol = HeaderRange.Find(what:="86Sr/87Sr", MatchCase:=False).Column
-                        CheckRatio86Sr87Sr = True
-                    Else
-                        Set Ratio86Sr87SrCol = HeaderRange.Find(what:="88Sr->104/87Sr->103", MatchCase:=False)
-                        If Not Ratio86Sr87SrCol Is Nothing Then
-                        Ratio86Sr87SrCol = HeaderRange.Find(what:="88Sr->104/87Sr->103", MatchCase:=False).Column
-                        CheckRatio86Sr87Sr = True
+                        Set Ratio87Rb87SrCol = HeaderRange.Find(what:="85Rb/87Sr", MatchCase:=False)
+                        If Not Ratio87Rb87SrCol Is Nothing Then
+                            Ratio87Rb87SrCol = HeaderRange.Find(what:="85Rb/87Sr", MatchCase:=False).Column
+                            CheckRatio87Rb87Sr = True
                         Else
-                            CheckRatio86Sr87Sr = False
+                            CheckRatio87Rb87Sr = False
                         End If
                     End If
-                End If
+                'Check and define 86Sr/867r ratio
+                    Set Ratio86Sr87SrCol = HeaderRange.Find(what:="86Sr->102/87Sr->103", MatchCase:=False)
+                    If Not Ratio86Sr87SrCol Is Nothing Then
+                        Ratio86Sr87SrCol = HeaderRange.Find(what:="86Sr->102/87Sr->103", MatchCase:=False).Column
+                        CheckRatio86Sr87Sr = True
+                    Else
+                        Set Ratio86Sr87SrCol = HeaderRange.Find(what:="86Sr/87Sr", MatchCase:=False)
+                        If Not Ratio86Sr87SrCol Is Nothing Then
+                            Ratio86Sr87SrCol = HeaderRange.Find(what:="86Sr/87Sr", MatchCase:=False).Column
+                            CheckRatio86Sr87Sr = True
+                        Else
+                            Set Ratio86Sr87SrCol = HeaderRange.Find(what:="88Sr->104/87Sr->103", MatchCase:=False)
+                            If Not Ratio86Sr87SrCol Is Nothing Then
+                            Ratio86Sr87SrCol = HeaderRange.Find(what:="88Sr->104/87Sr->103", MatchCase:=False).Column
+                            CheckRatio86Sr87Sr = True
+                            Else
+                                CheckRatio86Sr87Sr = False
+                            End If
+                        End If
+                    End If
+            Case "SymNum"
+                'CPS Columns
+                    Select Case TraceElementDataPresent
+                        Case True
+                            CPScol1 = HeaderRange.Find(what:="Rb85", MatchCase:=False, lookat:=xlPart).Column
+                            Set Ratio87Rb86SrCol = HeaderRange.Find(what:="Rb85/Sr86->102", MatchCase:=False)
+                            If Not Ratio87Rb86SrCol Is Nothing Then
+                                CPScol2 = HeaderRange.Find(what:="Sr86", MatchCase:=False, lookat:=xlPart).Column
+                                CommonIsotope = "Sr86"
+                            Else
+                                CPScol2 = HeaderRange.Find(what:="Sr88", MatchCase:=False, lookat:=xlPart).Column
+                                CommonIsotope = "Sr88"
+                            End If
+                            CPScol3 = HeaderRange.Find(what:="Sr87", MatchCase:=False, lookat:=xlPart).Column
+                        Case False
+                    End Select
+                'Check and define 85Rb/86Sr ratio (Rb85 used as proxy to measure Rb87)
+                    Set Ratio87Rb86SrCol = HeaderRange.Find(what:="Rb85/Sr86->102", MatchCase:=False)
+                    If Not Ratio87Rb86SrCol Is Nothing Then
+                        Ratio87Rb86SrCol = HeaderRange.Find(what:="Rb85/Sr86->102", MatchCase:=False).Column
+                        CheckRatio87Rb86Sr = True
+                    Else
+                        Set Ratio87Rb86SrCol = HeaderRange.Find(what:="Rb85/Sr86", MatchCase:=False)
+                        If Not Ratio87Rb86SrCol Is Nothing Then
+                            Ratio87Rb86SrCol = HeaderRange.Find(what:="Rb85/Sr86", MatchCase:=False).Column
+                            CheckRatio87Rb86Sr = True
+                        Else
+                            Set Ratio87Rb86SrCol = HeaderRange.Find(what:="Rb85/Sr88->104", MatchCase:=False)
+                            If Not Ratio87Rb86SrCol Is Nothing Then
+                                Ratio87Rb86SrCol = HeaderRange.Find(what:="Rb85/Sr88->104", MatchCase:=False).Column
+                                CheckRatio87Rb86Sr = True
+                            Else
+                                CheckRatio87Rb86Sr = False
+                            End If
+                        End If
+                    End If
+                'Check and define 87Sr/86Sr ratio
+                    Set Ratio87Sr86SrCol = HeaderRange.Find(what:="Sr87->103/Sr86->102", MatchCase:=False)
+                    If Not Ratio87Sr86SrCol Is Nothing Then
+                        Ratio87Sr86SrCol = HeaderRange.Find(what:="Sr87->103/Sr86->102", MatchCase:=False).Column
+                        CheckRatio87Sr86Sr = True
+                    Else
+                        Set Ratio87Sr86SrCol = HeaderRange.Find(what:="Sr87/Sr86", MatchCase:=False)
+                        If Not Ratio87Sr86SrCol Is Nothing Then
+                            Ratio87Sr86SrCol = HeaderRange.Find(what:="Sr87/Sr86", MatchCase:=False).Column
+                            CheckRatio87Sr86Sr = True
+                        Else
+                            Set Ratio87Sr86SrCol = HeaderRange.Find(what:="Sr87->103/Sr88->104", MatchCase:=False)
+                            If Not Ratio87Sr86SrCol Is Nothing Then
+                                Ratio87Sr86SrCol = HeaderRange.Find(what:="Sr87->103/Sr88->104", MatchCase:=False).Column
+                                CheckRatio87Sr86Sr = True
+                            Else
+                                CheckRatio87Sr86Sr = False
+                            End If
+                        End If
+                    End If
+                'Check and define 85Rb/87Sr ratio (Rb85 used as proxy to measure Rb87)
+                    Set Ratio87Rb87SrCol = HeaderRange.Find(what:="Rb85/Sr87->103", MatchCase:=False)
+                    If Not Ratio87Rb87SrCol Is Nothing Then
+                        Ratio87Rb87SrCol = HeaderRange.Find(what:="Rb85/Sr87->103", MatchCase:=False).Column
+                        CheckRatio87Rb87Sr = True
+                    Else
+                        Set Ratio87Rb87SrCol = HeaderRange.Find(what:="Rb85/Sr87", MatchCase:=False)
+                        If Not Ratio87Rb87SrCol Is Nothing Then
+                            Ratio87Rb87SrCol = HeaderRange.Find(what:="Rb85/Sr87", MatchCase:=False).Column
+                            CheckRatio87Rb87Sr = True
+                        Else
+                            CheckRatio87Rb87Sr = False
+                        End If
+                    End If
+                'Check and define 86Sr/867r ratio
+                    Set Ratio86Sr87SrCol = HeaderRange.Find(what:="Sr86->102/Sr87->103", MatchCase:=False)
+                    If Not Ratio86Sr87SrCol Is Nothing Then
+                        Ratio86Sr87SrCol = HeaderRange.Find(what:="Sr86->102/Sr87->103", MatchCase:=False).Column
+                        CheckRatio86Sr87Sr = True
+                    Else
+                        Set Ratio86Sr87SrCol = HeaderRange.Find(what:="Sr86/Sr87", MatchCase:=False)
+                        If Not Ratio86Sr87SrCol Is Nothing Then
+                            Ratio86Sr87SrCol = HeaderRange.Find(what:="Sr86/Sr87", MatchCase:=False).Column
+                            CheckRatio86Sr87Sr = True
+                        Else
+                            Set Ratio86Sr87SrCol = HeaderRange.Find(what:="Sr88->104/Sr87->103", MatchCase:=False)
+                            If Not Ratio86Sr87SrCol Is Nothing Then
+                            Ratio86Sr87SrCol = HeaderRange.Find(what:="Sr88->104/Sr87->103", MatchCase:=False).Column
+                            CheckRatio86Sr87Sr = True
+                            Else
+                                CheckRatio86Sr87Sr = False
+                            End If
+                        End If
+                    End If
+            End Select
             'Check that at least one ratio pair (normal or inverse isochron) is present
                 If CheckRatio87Rb86Sr = True And CheckRatio87Sr86Sr = True Then
                     RatioPairNormalPresent = True
@@ -343,10 +472,12 @@ Start:
         Sheets("Original Data").Activate
     'Copy AL#, sample name and analysis number
         Range(Cells(ODStartRowA, ALNumCol), Cells(ODLastRowA, ALNumCol)).Copy Destination:=Sheets("Geochronology Data").Range("A1")
+        Sheets("Geochronology Data").Range("A1").Value = "ALnum"
         Range(Cells(ODStartRowA, SampleCol), Cells(ODLastRowA, AnalysisCol)).Copy Destination:=Sheets("Geochronology Data").Range("B1")
         Select Case TraceElementDataPresent
             Case True
                 Range(Cells(ODStartRowA, ALNumCol), Cells(ODLastRowA, ALNumCol)).Copy Destination:=Sheets("Elemental Data").Range("A1")
+                Sheets("Elemental Data").Range("A1").Value = "ALnum"
                 Range(Cells(ODStartRowA, SampleCol), Cells(ODLastRowA, AnalysisCol)).Copy Destination:=Sheets("Elemental Data").Range("B1")
             Case False
         End Select
@@ -355,10 +486,12 @@ Start:
                 Case True
                     EDLastCol = Sheets("Elemental Data").Cells(1, Columns.Count).End(xlToLeft).Column
                     EDNextCol = EDLastCol + 1
+                    Range(Cells(ODStartRowA, ElementTotalCol), Cells(ODLastRowA, ElementTotalCol)).Copy Destination:=Sheets("Elemental Data").Cells(1, EDNextCol)
+                    EDNextCol = EDNextCol + 1
                     For n = EleStartCol To EleEndCol
                         Range(Cells(ODStartRowA, n), Cells(ODLastRowA, n)).Copy Destination:=Sheets("Elemental Data").Cells(1, EDNextCol)
                         EDNextCol = EDNextCol + 1
-                        Sheets("Elemental Data").Cells(1, EDNextCol).Value = Sheets("Elemental Data").Cells(1, EDNextCol - 1).Value & " " & StandardErrorLevel & "SE"
+                        Sheets("Elemental Data").Cells(1, EDNextCol).Value = Sheets("Elemental Data").Cells(1, EDNextCol - 1).Value & "_" & StandardErrorLevel & "SE"
                         Range(Cells(ODStartRowB, n), Cells(ODLastRowB, n)).Copy Destination:=Sheets("Elemental Data").Cells(2, EDNextCol)
                         EDNextCol = EDNextCol + 1
                     Next n
@@ -371,26 +504,43 @@ Start:
             GDLastCol = Sheets("Geochronology Data").Cells(1, Columns.Count).End(xlToLeft).Column
             GDNextCol = GDLastCol + 1
             GDLastRow = Sheets("Geochronology Data").Cells(Rows.Count, 1).End(xlUp).Row
+        'Copy Important CPS columns
+            Select Case TraceElementDataPresent
+            Case True
+                'Rb85
+                    Range(Cells(ODStartRowC, CPScol1), Cells(ODLastRowC, CPScol1)).Copy Destination:=Sheets("Geochronology Data").Cells(2, GDNextCol)
+                    Sheets("Geochronology Data").Cells(1, GDNextCol).Value = "Rb85_CPS"
+                    GDNextCol = GDNextCol + 1
+                'Sr86 or Sr88 (depending on what was used for ratio)
+                    Range(Cells(ODStartRowC, CPScol2), Cells(ODLastRowC, CPScol2)).Copy Destination:=Sheets("Geochronology Data").Cells(2, GDNextCol)
+                    Sheets("Geochronology Data").Cells(1, GDNextCol).Value = CommonIsotope & "_CPS"
+                    GDNextCol = GDNextCol + 1
+                'Sr87
+                    Range(Cells(ODStartRowC, CPScol3), Cells(ODLastRowC, CPScol3)).Copy Destination:=Sheets("Geochronology Data").Cells(2, GDNextCol)
+                    Sheets("Geochronology Data").Cells(1, GDNextCol).Value = "Sr87_CPS"
+                    GDNextCol = GDNextCol + 1
+                Case False
+            End Select
         'Copy ratios and uncertainties, label uncertainty columns
         'Normal isochron ratios
             Select Case RatioPairNormalPresent
             Case True
                 '87Rb/86Sr
                     Range(Cells(ODStartRowA, Ratio87Rb86SrCol), Cells(ODLastRowA, Ratio87Rb86SrCol)).Copy Destination:=Sheets("Geochronology Data").Cells(1, GDNextCol)
-                    Sheets("Geochronology Data").Cells(1, GDNextCol).Value = "Rb87/Sr86"
+                    Sheets("Geochronology Data").Cells(1, GDNextCol).Value = "Rb87Sr86"
                     GDNextCol = GDNextCol + 1
-                    Sheets("Geochronology Data").Cells(1, GDNextCol).Value = "Uncertainty[Rb87/Sr86] " & StandardErrorLevel & "SE"
+                    Sheets("Geochronology Data").Cells(1, GDNextCol).Value = "Rb87Sr86_" & StandardErrorLevel & "SE"
                     Range(Cells(ODStartRowB, Ratio87Rb86SrCol), Cells(ODLastRowB, Ratio87Rb86SrCol)).Copy Destination:=Sheets("Geochronology Data").Cells(2, GDNextCol)
                     GDNextCol = GDNextCol + 1
                 '87Sr/86Sr
                     Range(Cells(ODStartRowA, Ratio87Sr86SrCol), Cells(ODLastRowA, Ratio87Sr86SrCol)).Copy Destination:=Sheets("Geochronology Data").Cells(1, GDNextCol)
-                    Sheets("Geochronology Data").Cells(1, GDNextCol).Value = "Sr87/Sr86"
+                    Sheets("Geochronology Data").Cells(1, GDNextCol).Value = "Sr87Sr86"
                     GDNextCol = GDNextCol + 1
-                    Sheets("Geochronology Data").Cells(1, GDNextCol).Value = "Uncertainty[Sr87/Sr86] " & StandardErrorLevel & "SE"
+                    Sheets("Geochronology Data").Cells(1, GDNextCol).Value = "Sr87Sr86_" & StandardErrorLevel & "SE"
                     Range(Cells(ODStartRowB, Ratio87Sr86SrCol), Cells(ODLastRowB, Ratio87Sr86SrCol)).Copy Destination:=Sheets("Geochronology Data").Cells(2, GDNextCol)
                     GDNextCol = GDNextCol + 1
             'Copy/calculate error correlation (rho)
-                Sheets("Geochronology Data").Cells(1, GDNextCol).Value = "Rho[Rb87/Sr86][Sr87/Sr86]"
+                Sheets("Geochronology Data").Cells(1, GDNextCol).Value = "Rho_Rb87Sr86_Sr87Sr86]"
                 Select Case RhoCalc
                     Case False
                         If IsNumeric(RhoRbSrCol) Then
@@ -415,20 +565,20 @@ Start:
             Case True
                 '85Rb(87Rb)/87Sr
                     Range(Cells(ODStartRowA, Ratio87Rb87SrCol), Cells(ODLastRowA, Ratio87Rb87SrCol)).Copy Destination:=Sheets("Geochronology Data").Cells(1, GDNextCol)
-                    Sheets("Geochronology Data").Cells(1, GDNextCol).Value = "Rb87/Sr87"
+                    Sheets("Geochronology Data").Cells(1, GDNextCol).Value = "Rb87Sr87"
                     GDNextCol = GDNextCol + 1
-                    Sheets("Geochronology Data").Cells(1, GDNextCol).Value = "Uncertainty[Rb87/Sr87] " & StandardErrorLevel & "SE"
+                    Sheets("Geochronology Data").Cells(1, GDNextCol).Value = "Rb87Sr87_" & StandardErrorLevel & "SE"
                     Range(Cells(ODStartRowB, Ratio87Rb87SrCol), Cells(ODLastRowB, Ratio87Rb87SrCol)).Copy Destination:=Sheets("Geochronology Data").Cells(2, GDNextCol)
                     GDNextCol = GDNextCol + 1
                 '86Sr/87Sr
                     Range(Cells(ODStartRowA, Ratio86Sr87SrCol), Cells(ODLastRowA, Ratio86Sr87SrCol)).Copy Destination:=Sheets("Geochronology Data").Cells(1, GDNextCol)
-                    Sheets("Geochronology Data").Cells(1, GDNextCol).Value = "Sr86/Sr87"
+                    Sheets("Geochronology Data").Cells(1, GDNextCol).Value = "Sr86Sr87"
                     GDNextCol = GDNextCol + 1
-                    Sheets("Geochronology Data").Cells(1, GDNextCol).Value = "Uncertainty[Sr86/Sr87] " & StandardErrorLevel & "SE"
+                    Sheets("Geochronology Data").Cells(1, GDNextCol).Value = "Sr86Sr87_" & StandardErrorLevel & "SE"
                     Range(Cells(ODStartRowB, Ratio86Sr87SrCol), Cells(ODLastRowB, Ratio86Sr87SrCol)).Copy Destination:=Sheets("Geochronology Data").Cells(2, GDNextCol)
                     GDNextCol = GDNextCol + 1
             'Copy/calculate error correlation (rho)
-                Sheets("Geochronology Data").Cells(1, GDNextCol).Value = "Rho[Rb87/Sr87][Sr86/Sr87]"
+                Sheets("Geochronology Data").Cells(1, GDNextCol).Value = "Rho_Rb87Sr87_Sr86Sr87"
                 Select Case RhoCalc
                     Case False
                         If IsNumeric(RhoRbSrCol) Then
@@ -466,11 +616,15 @@ Start:
             For n = 2 To GDLastRow
                 SourceFile = Cells(n, SFColDel).Value
                 SourceFile = Left(SourceFile, InStrRev(SourceFile, ".") - 1)
-                Sample = Left(SourceFile, InStrRev(SourceFile, "-") - 2)
+                If Mid(SourceFile, InStrRev(SourceFile, "-") - 1, 3) = " - " Then
+                    Sample = Left(SourceFile, InStrRev(SourceFile, "-") - 2)
+                Else
+                    Sample = Left(SourceFile, InStrRev(SourceFile, "-") - 1)
+                End If
                 Range("B" & n).Value = Sample
                 Analysis = Right(SourceFile, Len(SourceFile) - Len(Sample) - 2)
                 Analysis = Format(Analysis, "000")
-                Range("C" & n).Value = Sample & " - " & Analysis
+                Range("C" & n).Value = Sample & "-" & Analysis
             Next n
         'Copy corrected sample and analysis labels to elemental data
            Select Case TraceElementDataPresent
@@ -701,6 +855,13 @@ Start:
                         .Range(Cells(1, ComCol), Cells(LastRow, ComCol)).Columns.AutoFit
                         .Range("A1", Cells(1, LastCol)).Font.Bold = True
                         .Range("A1", Cells(LastRow, LastCol)).Font.Size = 8
+                        Select Case TraceElementDataPresent
+                        Case True
+                            CPScol1 = Range("A1", Cells(1, LastCol)).Find(what:="Rb85_CPS", MatchCase:=True).Column
+                            CPScol2 = Range("A1", Cells(1, LastCol)).Find(what:="Sr87_CPS", MatchCase:=True).Column
+                            .Range(Cells(2, CPScol1), Cells(LastRow, CPScol2)).NumberFormat = "0"
+                        Case False
+                        End Select
                     End With
                     With ActiveWindow
                         .SplitColumn = 3
@@ -719,6 +880,13 @@ Start:
                         .Range(Cells(1, ComCol), Cells(LastRow, ComCol)).Columns.AutoFit
                         .Range("A1", Cells(1, LastCol)).Font.Bold = True
                         .Range("A1", Cells(LastRow, LastCol)).Font.Size = 8
+                        Select Case TraceElementDataPresent
+                        Case True
+                            CPScol1 = Range("A1", Cells(1, LastCol)).Find(what:="Rb85_CPS", MatchCase:=True).Column
+                            CPScol2 = Range("A1", Cells(1, LastCol)).Find(what:="Sr87_CPS", MatchCase:=True).Column
+                            .Range(Cells(2, CPScol1), Cells(LastRow, CPScol2)).NumberFormat = "0"
+                        Case False
+                        End Select
                     End With
                     With ActiveWindow
                         .SplitColumn = 3
@@ -887,10 +1055,10 @@ Start:
         End If
     'Find filtered results section and define variables
         With Sheets("Original Data")
-            FMrow = Range("A:A").Find(what:="Mass", MatchCase:=True, lookat:=xlWhole).Row
-            FMrow = FMrow + 1
-            FirstMass = Range("A" & FMrow).Value
-            LastMass = Range("B" & FMrow).End(xlDown).Offset(0, -1).Value
+            FirstMassRow = Range("A:A").Find(what:="Mass", MatchCase:=True, lookat:=xlWhole).Row
+            FirstMassRow = FirstMassRow + 1
+            FirstMass = Range("A" & FirstMassRow).Value
+            LastMass = Range("B" & FirstMassRow).End(xlDown).Offset(0, -1).Value
             ODStartRowA = Range("A:A").Find(what:="FilteredConcentration_PPM", MatchCase:=True, lookat:=xlPart).Row
             ODStartRowA = ODStartRowA + 2
             ODLastRowA = Range("C" & ODStartRowA).End(xlDown).Row
@@ -910,22 +1078,48 @@ Start:
             SampleCol = HeaderRange.Find(what:="Sample", MatchCase:=False).Column
             AnalysisCol = HeaderRange.Find(what:="Analysis", MatchCase:=False).Column
             CommentsCol = HeaderRange.Find(what:="Comment", MatchCase:=False).Column
-            'Check and define 238U/206Pb ratio (238U/206Pb as proxy for 85Rb/86Sr or 85Rb/87Sr to determine error correlation in LADR)
-                Set Ratio87Rb86SrCol = HeaderRange.Find(what:="238U/206Pb", MatchCase:=False)
-                If Not Ratio87Rb86SrCol Is Nothing Then
-                    Ratio87Rb86SrCol = HeaderRange.Find(what:="238U/206Pb", MatchCase:=False).Column
-                    CheckRatio87Rb86Sr = True
-                Else
-                    CheckRatio87Rb86Sr = False
-                End If
-            'Check and define 207Pb/206Pb ratio (207Pb/206Pb as proxy for 87Sr/86Sr or 86Sr/87Sr to determine error correlation in LADR)
-                Set Ratio87Sr86SrCol = HeaderRange.Find(what:="207Pb/206Pb", MatchCase:=False)
-                If Not Ratio87Sr86SrCol Is Nothing Then
-                    Ratio87Sr86SrCol = HeaderRange.Find(what:="207Pb/206Pb", MatchCase:=False).Column
-                    CheckRatio87Sr86Sr = True
-                Else
-                    CheckRatio87Sr86Sr = False
-                End If
+    'Check Element number and symbol order
+            If Cells(FirstMassRow, 1).Value Like "#*" Then
+                ElementSymNumOrder = "NumSym"
+            ElseIf Cells(FirstMassRow, 1).Value Like "[A-Z]*" Then
+                ElementSymNumOrder = "SymNum"
+            End If
+        Select Case ElementSymNumOrder
+            Case "NumSym"
+                'Check and define 238U/206Pb ratio (238U/206Pb as proxy for 85Rb/86Sr or 85Rb/87Sr to determine error correlation in LADR)
+                    Set Ratio87Rb86SrCol = HeaderRange.Find(what:="238U/206Pb", MatchCase:=False)
+                    If Not Ratio87Rb86SrCol Is Nothing Then
+                        Ratio87Rb86SrCol = HeaderRange.Find(what:="238U/206Pb", MatchCase:=False).Column
+                        CheckRatio87Rb86Sr = True
+                    Else
+                        CheckRatio87Rb86Sr = False
+                    End If
+                'Check and define 207Pb/206Pb ratio (207Pb/206Pb as proxy for 87Sr/86Sr or 86Sr/87Sr to determine error correlation in LADR)
+                    Set Ratio87Sr86SrCol = HeaderRange.Find(what:="207Pb/206Pb", MatchCase:=False)
+                    If Not Ratio87Sr86SrCol Is Nothing Then
+                        Ratio87Sr86SrCol = HeaderRange.Find(what:="207Pb/206Pb", MatchCase:=False).Column
+                        CheckRatio87Sr86Sr = True
+                    Else
+                        CheckRatio87Sr86Sr = False
+                    End If
+            Case "SymNum"
+                'Check and define 238U/206Pb ratio (238U/206Pb as proxy for 85Rb/86Sr or 85Rb/87Sr to determine error correlation in LADR)
+                    Set Ratio87Rb86SrCol = HeaderRange.Find(what:="U238/Pb206", MatchCase:=False)
+                    If Not Ratio87Rb86SrCol Is Nothing Then
+                        Ratio87Rb86SrCol = HeaderRange.Find(what:="U238/Pb206", MatchCase:=False).Column
+                        CheckRatio87Rb86Sr = True
+                    Else
+                        CheckRatio87Rb86Sr = False
+                    End If
+                'Check and define 207Pb/206Pb ratio (207Pb/206Pb as proxy for 87Sr/86Sr or 86Sr/87Sr to determine error correlation in LADR)
+                    Set Ratio87Sr86SrCol = HeaderRange.Find(what:="Pb207/Pb206", MatchCase:=False)
+                    If Not Ratio87Sr86SrCol Is Nothing Then
+                        Ratio87Sr86SrCol = HeaderRange.Find(what:="Pb207/Pb206", MatchCase:=False).Column
+                        CheckRatio87Sr86Sr = True
+                    Else
+                        CheckRatio87Sr86Sr = False
+                    End If
+            End Select
             'Check that at least one ratio pair (normal or inverse isochron) is present
                 If CheckRatio87Rb86Sr = True And CheckRatio87Sr86Sr = True Then
                     RatioPairNormalPresent = True
@@ -1008,11 +1202,15 @@ Start:
             For n = 2 To GDLastRow
                 SourceFile = Cells(n, SFColDel).Value
                 SourceFile = Left(SourceFile, InStrRev(SourceFile, ".") - 1)
-                Sample = Left(SourceFile, InStrRev(SourceFile, "-") - 2)
+                If Mid(SourceFile, InStrRev(SourceFile, "-") - 1, 3) = " - " Then
+                    Sample = Left(SourceFile, InStrRev(SourceFile, "-") - 2)
+                Else
+                    Sample = Left(SourceFile, InStrRev(SourceFile, "-") - 1)
+                End If
                 Range("B" & n).Value = Sample
                 Analysis = Right(SourceFile, Len(SourceFile) - Len(Sample) - 2)
                 Analysis = Format(Analysis, "000")
-                Range("C" & n).Value = Sample & " - " & Analysis
+                Range("C" & n).Value = Sample & "-" & Analysis
             Next n
     'Sort prior to cut - performance optimisation
         'Delete sourcefile column

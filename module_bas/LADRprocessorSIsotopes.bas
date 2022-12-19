@@ -1,5 +1,6 @@
 Attribute VB_Name = "LADRprocessorSIsotopes"
 'Module for handling LADR S isotope ratio data outputs
+'Last modified on 2022-12-19
 Option Explicit
 Option Compare Text
 'Variable declaration
@@ -26,7 +27,7 @@ Option Compare Text
         Dim RDNextCol As Long
         Dim EDNextCol As Long
     'Variables for headers in original data
-        Dim FMrow As String
+        Dim FirstMassRow As String
         Dim FirstMass As String
         Dim LastMass As String
         Dim SourceFileCol As Long
@@ -34,6 +35,7 @@ Option Compare Text
         Dim AnalysisCol As Long
         Dim ALNumCol As Long
         Dim CommentsCol As Long
+        Dim ElementTotalCol As Long
         Dim EleStartCol As Variant
         Dim EleEndCol As Long
         Dim TraceElementDataPresent As Boolean
@@ -43,6 +45,7 @@ Option Compare Text
         Dim CommentsColEle As Long
         Dim EleUnStartCol As Long
         Dim EleUnEndCol As Long
+        Dim ElementSymNumOrder As Variant
     'Variables for sorting
         Dim SFColDel As Long
         Dim RDLastRow As Long
@@ -89,7 +92,7 @@ Sub LADRSIsotopeArranger()
 'Feel free to modify but give credit and do not sell any version of this, modified or not. It is to remain free for those who need it
 
     'Define number and name of standards
-DefineStandards:            NumStandards = Application.InputBox("How many different standards were used?", "LADR_S_Isotope_Arranger", 4, Type:=1)
+DefineStandards:            NumStandards = Application.InputBox("How many different standards were used?", "LADR_S_Isotope_Arranger", 2, Type:=1)
         Select Case NumStandards
             Case 1
                 Standard1 = Application.InputBox("What is the sample name of the first standard as it is shown in the output CSV?", "LADR_S_Isotope_Arranger", Type:=2)
@@ -178,10 +181,10 @@ Start:
         StandardErrorLevel = Left(StandardErrorLevel, 1)
     'Find filtered results section and define variables
         With Sheets("Original Data")
-            FMrow = Range("A:A").Find(what:="Mass", MatchCase:=True, lookat:=xlWhole).Row
-            FMrow = FMrow + 1
-            FirstMass = Range("A" & FMrow).Value
-            LastMass = Range("B" & FMrow).End(xlDown).Offset(0, -1).Value
+            FirstMassRow = Range("A:A").Find(what:="Mass", MatchCase:=True, lookat:=xlWhole).Row
+            FirstMassRow = FirstMassRow + 1
+            FirstMass = Range("A" & FirstMassRow).Value
+            LastMass = Range("B" & FirstMassRow).End(xlDown).Offset(0, -1).Value
             ODStartRowA = Range("A:A").Find(what:="FilteredConcentration_PPM", MatchCase:=True, lookat:=xlPart).Row
             ODStartRowA = ODStartRowA + 2
             ODLastRowA = Range("C" & ODStartRowA).End(xlDown).Row
@@ -201,10 +204,22 @@ Start:
             SampleCol = HeaderRange.Find(what:="Sample", MatchCase:=False).Column
             AnalysisCol = HeaderRange.Find(what:="Analysis", MatchCase:=False).Column
             CommentsCol = HeaderRange.Find(what:="Comment", MatchCase:=False).Column
-            RatioS34S32Col = HeaderRange.Find(what:="34S->66/32S->64", MatchCase:=False).Column
+            'Define element symbol and number order
+                If Cells(FirstMassRow, 1).Value Like "#*" Then
+                    ElementSymNumOrder = "NumSym"
+                ElseIf Cells(FirstMassRow, 1).Value Like "[A-Z]*" Then
+                    ElementSymNumOrder = "SymNum"
+                End If
+            Select Case ElementSymNumOrder
+            Case "NumSym"
+                RatioS34S32Col = HeaderRange.Find(what:="34S->66/32S->64", MatchCase:=False).Column
+            Case "SymNum"
+                RatioS34S32Col = HeaderRange.Find(what:="S34->66/S32->64", MatchCase:=False).Column
+            End Select
             'Check and define presence of trace element data
                 Set EleStartCol = HeaderRange.Find(what:=FirstMass, MatchCase:=False)
                 If Not EleStartCol Is Nothing Then
+                    ElementTotalCol = HeaderRange.Find(what:="Element Total", MatchCase:=False).Column
                     EleStartCol = HeaderRange.Find(what:=FirstMass, MatchCase:=False).Column
                     EleEndCol = HeaderRange.Find(what:=LastMass, MatchCase:=False).Column
                     TraceElementDataPresent = True
@@ -222,10 +237,12 @@ Start:
         Sheets("Original Data").Activate
     'Copy AL#, sample name and analysis number
         Range(Cells(ODStartRowA, ALNumCol), Cells(ODLastRowA, ALNumCol)).Copy Destination:=Sheets("Ratio Data").Range("A1")
+        Sheets("Geochronology Data").Range("A1").Value = "ALnum"
         Range(Cells(ODStartRowA, SampleCol), Cells(ODLastRowA, AnalysisCol)).Copy Destination:=Sheets("Ratio Data").Range("B1")
         Select Case TraceElementDataPresent
             Case True
                 Range(Cells(ODStartRowA, ALNumCol), Cells(ODLastRowA, ALNumCol)).Copy Destination:=Sheets("Elemental Data").Range("A1")
+                Sheets("Elemental Data").Range("A1").Value = "ALnum"
                 Range(Cells(ODStartRowA, SampleCol), Cells(ODLastRowA, AnalysisCol)).Copy Destination:=Sheets("Elemental Data").Range("B1")
             Case False
         End Select
@@ -237,9 +254,9 @@ Start:
         'Copy ratios and uncertainties, label uncertainty columns
         'S34/S32
             Range(Cells(ODStartRowA, RatioS34S32Col), Cells(ODLastRowA, RatioS34S32Col)).Copy Destination:=Sheets("Ratio Data").Cells(1, RDNextCol)
-            Sheets("Ratio Data").Cells(1, RDNextCol).Value = "S34/S32"
+            Sheets("Ratio Data").Cells(1, RDNextCol).Value = "S34S32"
             RDNextCol = RDNextCol + 1
-            Sheets("Ratio Data").Cells(1, RDNextCol).Value = "Uncertainty[S34/S32] " & StandardErrorLevel & "SE"
+            Sheets("Ratio Data").Cells(1, RDNextCol).Value = "Uncertainty_S34S32_" & StandardErrorLevel & "SE"
             Range(Cells(ODStartRowB, RatioS34S32Col), Cells(ODLastRowB, RatioS34S32Col)).Copy Destination:=Sheets("Ratio Data").Cells(2, RDNextCol)
             RDNextCol = RDNextCol + 1
         'Copy elemental concentrations and uncertainty data
@@ -247,10 +264,12 @@ Start:
                 Case True
                     EDLastCol = Sheets("Elemental Data").Cells(1, Columns.Count).End(xlToLeft).Column
                     EDNextCol = EDLastCol + 1
+                    Range(Cells(ODStartRowA, ElementTotalCol), Cells(ODLastRowA, ElementTotalCol)).Copy Destination:=Sheets("Elemental Data").Cells(1, EDNextCol)
+                    EDNextCol = EDNextCol + 1
                     For n = EleStartCol To EleEndCol
                         Range(Cells(ODStartRowA, n), Cells(ODLastRowA, n)).Copy Destination:=Sheets("Elemental Data").Cells(1, EDNextCol)
                         EDNextCol = EDNextCol + 1
-                        Sheets("Elemental Data").Cells(1, EDNextCol).Value = Sheets("Elemental Data").Cells(1, EDNextCol - 1).Value & " " & StandardErrorLevel & "SE"
+                        Sheets("Elemental Data").Cells(1, EDNextCol).Value = Sheets("Elemental Data").Cells(1, EDNextCol - 1).Value & "_" & StandardErrorLevel & "SE"
                         Range(Cells(ODStartRowB, n), Cells(ODLastRowB, n)).Copy Destination:=Sheets("Elemental Data").Cells(2, EDNextCol)
                         EDNextCol = EDNextCol + 1
                     Next n
@@ -270,18 +289,21 @@ Start:
         'Copy Source Filename
             Range(Cells(ODStartRowA, SourceFileCol), Cells(ODLastRowA, SourceFileCol)).Copy Destination:=Sheets("Ratio Data").Cells(1, RDNextCol)
             SFColDel = RDNextCol
-    
     Sheets("Ratio Data").Activate 'Correct sample label and trailing number for correct sorting in Excel
             RDLastCol = Sheets("Ratio Data").Cells(1, Columns.Count).End(xlToLeft).Column
             RDLastRow = Sheets("Ratio Data").Cells(Rows.Count, 1).End(xlUp).Row
             For n = 2 To RDLastRow
                 SourceFile = Cells(n, SFColDel).Value
                 SourceFile = Left(SourceFile, InStrRev(SourceFile, ".") - 1)
-                Sample = Left(SourceFile, InStrRev(SourceFile, "-") - 2)
+                If Mid(SourceFile, InStrRev(SourceFile, "-") - 1, 3) = " - " Then
+                    Sample = Left(SourceFile, InStrRev(SourceFile, "-") - 2)
+                Else
+                    Sample = Left(SourceFile, InStrRev(SourceFile, "-") - 1)
+                End If
                 Range("B" & n).Value = Sample
                 Analysis = Right(SourceFile, Len(SourceFile) - Len(Sample) - 2)
                 Analysis = Format(Analysis, "000")
-                Range("C" & n).Value = Sample & " - " & Analysis
+                Range("C" & n).Value = Sample & "-" & Analysis
             Next n
         'Copy corrected sample and analysis labels to elemental data
            Select Case TraceElementDataPresent
